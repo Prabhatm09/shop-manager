@@ -56,6 +56,12 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
               <Store size={26} />
             </div>
 
+             {/* <img
+                src="/rmtrader.jpg"
+                alt="RM Trader"
+                className="h-full w-full object-cover"
+            /> */}
+
             <div>
               <h2 className="text-lg font-bold text-slate-900">Shop Manager</h2>
               <p className="text-xs text-slate-500">Building material shop</p>

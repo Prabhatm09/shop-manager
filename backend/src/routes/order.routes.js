@@ -3,6 +3,7 @@ const express = require("express");
 const {
   createOrder,
   getOrders,
+  quickSale,
   getOrderById,
   getOrdersByCustomer,
   getReturnReminders,
@@ -24,6 +25,7 @@ router.get("/returns/reminders", getReturnReminders);
 
 router.patch("/:id/mark-returned", markOrderReturned);
 router.patch("/:id/status", updateOrderStatus);
+router.post("/quick-sale", quickSale);
 
 router
   .route("/:id")

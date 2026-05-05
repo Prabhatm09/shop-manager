@@ -133,6 +133,21 @@ const deleteCustomer = async (req, res) => {
   }
 };
 
+const getOrCreateWalkInCustomer = async () => {
+  let customer = await Customer.findOne({ phone: "0000000000" });
+
+  if (!customer) {
+    customer = await Customer.create({
+      name: "Walk-in Customer",
+      phone: "0000000000",
+      address: "N/A",
+      openingDue: 0,
+    });
+  }
+
+  return customer._id;
+};
+
 module.exports = {
   createCustomer,
   getCustomers,

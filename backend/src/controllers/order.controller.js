@@ -553,9 +553,143 @@ const updateOrderStatus = async (req, res) => {
   }
 };
 
+const quickSale = async (req, res) => {
+  try {
+    const { items, paymentMode = "cash" } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        message: "No items provided",
+      });
+    }
+
+    let customer = await Customer.findOne({
+      phone: "0000000000",
+      createdBy: req.user._id,
+    });
+
+    if (!customer) {
+      customer = await Customer.create({
+        name: "Walk-in Customer",
+        phone: "0000000000",
+        address: "Counter Sale",
+        openingDue: 0,
+        createdBy: req.user._id,
+      });
+    }
+
+    const orderItems = [];
+    const stockUpdates = [];
+    let subTotal = 0;
+
+    for (const item of items) {
+      const product = await Product.findOne({
+        _id: item.productId,
+        createdBy: req.user._id,
+      });
+
+      if (!product) {
+        return res.status(404).json({
+          message: "Product not found",
+        });
+      }
+
+      const quantity = Number(item.quantity || 0);
+      const pricePerUnit = Number(item.pricePerUnit || product.pricePerUnit || 0);
+      const conversionToBase = Number(item.conversionToBase || 1);
+      const selectedUnit = item.selectedUnit || product.unit;
+
+      if (quantity <= 0) {
+        return res.status(400).json({
+          message: "Quantity must be greater than 0",
+        });
+      }
+
+      const stockDeduct = quantity * conversionToBase;
+
+      if (stockDeduct > product.currentStock) {
+        return res.status(400).json({
+          message: `${product.name} stock not enough. Available: ${product.currentStock}`,
+        });
+      }
+
+      const total = quantity * pricePerUnit;
+      subTotal += total;
+
+      orderItems.push({
+        product: product._id,
+        productName: product.name,
+        unit: selectedUnit,
+        selectedUnit,
+        quantity,
+        conversionToBase,
+        baseQuantity: stockDeduct,
+        pricePerUnit,
+        total,
+      });
+
+      stockUpdates.push({
+        product,
+        quantity: stockDeduct,
+        previousStock: product.currentStock,
+        newStock: product.currentStock - stockDeduct,
+      });
+    }
+
+    const order = await Order.create({
+      orderType: "sale",
+      customer: customer._id,
+      customerName: customer.name,
+      customerPhone: customer.phone,
+      items: orderItems,
+      subTotal,
+      paidAmount: subTotal,
+      dueAmount: 0,
+      paymentStatus: "paid",
+      orderStatus: "delivered",
+      deliveryAddress: "Counter Sale",
+      deliveryCharge: 0,
+      returnStatus: "not_required",
+      notes: `Quick sale payment mode: ${paymentMode}`,
+      createdBy: req.user._id,
+    });
+
+    for (const update of stockUpdates) {
+      update.product.currentStock = update.newStock;
+      await update.product.save();
+
+      await StockMovement.create({
+        product: update.product._id,
+        productName: update.product.name,
+        type: "stock_out",
+        quantity: update.quantity,
+        previousStock: update.previousStock,
+        newStock: update.newStock,
+        reason: "Quick sale",
+        referenceType: "order",
+        referenceId: order._id,
+        createdBy: req.user._id,
+      });
+    }
+
+    return res.status(201).json({
+      message: "Quick sale completed successfully",
+      order,
+    });
+  } catch (error) {
+    console.log("Quick sale error:", error);
+
+    return res.status(500).json({
+      message: "Quick sale failed",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createOrder,
   getOrders,
+  quickSale,
   getOrderById,
   getOrdersByCustomer,
   getReturnReminders,

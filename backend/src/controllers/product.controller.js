@@ -4,33 +4,38 @@ const StockMovement = require("../models/StockMovement");
 const createProduct = async (req, res) => {
   try {
     const {
-        name,
-        category,
-        subCategory,
-        unit,
-        pricePerUnit,
-        currentStock,
-        lowStockAlert,
-        description,
+     name,
+    category,
+    subCategory,
+    unit,
+    pricePerUnit,
+    currentStock,
+    lowStockAlert,
+    description,
+    saleUnits,
+    quickQuantities,
     } = req.body;
 
-    if (!name || !category || !unit || pricePerUnit === undefined) {
-      return res.status(400).json({
-        message: "Name, category, unit and price are required",
-      });
-    }
+    if (!name || !category || !subCategory || !unit || pricePerUnit === undefined) {
+        return res.status(400).json({
+            message: "Name, category, sub category, unit and price are required",
+        });
+     }
 
     const openingStock = Number(currentStock || 0);
 
     const product = await Product.create({
-      name,
-      category,
-      unit,
-      pricePerUnit: Number(pricePerUnit),
-      currentStock: openingStock,
-      lowStockAlert: Number(lowStockAlert || 10),
-      description: description || "",
-      createdBy: req.user._id,
+        name,
+        category,
+        subCategory, // ✅ this was missing
+        unit,
+        pricePerUnit: Number(pricePerUnit),
+        currentStock: Number(currentStock || 0),
+        lowStockAlert: Number(lowStockAlert || 10),
+        description: description || "",
+        saleUnits: saleUnits || [],
+        quickQuantities: quickQuantities || [],
+        createdBy: req.user._id,
     });
 
     if (openingStock > 0) {

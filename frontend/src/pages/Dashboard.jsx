@@ -3,11 +3,13 @@ import { IndianRupee, Package, ShoppingCart, Users } from "lucide-react";
 import API from "../api/axios";
 import AppLayout from "../components/AppLayout";
 import CreateOrderModal from "../components/CreateOrderModal";
+import QuickSaleModal from "../components/QuickSaleModal";
 
 
 const Dashboard = () => {
 
    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+   const [quickSaleOpen, setQuickSaleOpen] = useState(false);
   
   const [stats, setStats] = useState({
   totalProducts: 0,
@@ -138,12 +140,21 @@ const handleMarkReturned = async (orderId) => {
       title="Dashboard"
       subtitle="Overview of your building material shop"
       headerAction={
+    <div className="flex items-center gap-3">
     <button
+  onClick={() => setQuickSaleOpen(true)}
+  className="bg-green-600 w-full rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white md:w-auto"
+>
+  + Quick Sale
+</button>
+   <button
       onClick={() => setIsCreateModalOpen(true)}
       className="w-full rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700 md:w-auto"
     >
       + Create Order
     </button>
+    </div>
+ 
   }
     >
         
@@ -389,6 +400,10 @@ const handleMarkReturned = async (orderId) => {
 <CreateOrderModal
   open={isCreateModalOpen}
   onClose={() => setIsCreateModalOpen(false)}
+/>
+<QuickSaleModal
+  open={quickSaleOpen}
+  onClose={() => setQuickSaleOpen(false)}
 />
     </AppLayout>
   );
