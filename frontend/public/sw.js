@@ -1,5 +1,5 @@
-const CACHE_NAME = "rm-trader-shell-v1";
-const APP_SHELL = ["/", "/dashboard", "/manifest.webmanifest", "/pwa-icon.svg"];
+const CACHE_NAME = "rm-trader-shell-v2";
+const APP_SHELL = ["/", "/manifest.webmanifest", "/pwa-icon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

@@ -2,7 +2,7 @@
   "name": "RM Trader Shop Manager",
   "short_name": "RM Trader",
   "description": "Counter, stock, ledger, orders and invoices for RM Trader.",
-  "start_url": "/dashboard",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
