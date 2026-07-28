@@ -2,9 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { IndianRupee, Search, Wallet } from "lucide-react";
 import API from "../api/axios";
 import AppLayout from "../components/AppLayout";
-import PaymentFormModal, {
-  initialPaymentForm,
-} from "../components/PaymentFormModal";
+import PaymentFormModal from "../components/PaymentFormModal";
+import { initialPaymentForm } from "../constants/forms";
 
 const Payments = () => {
   const [orders, setOrders] = useState([]);
@@ -178,14 +177,14 @@ const Payments = () => {
       headerAction={
         <button
           onClick={() => openPaymentModal()}
-          className="w-full rounded-xl bg-green-600 px-5 py-3 font-semibold text-white hover:bg-green-700 md:w-auto"
+          className="btn-success w-full md:w-auto"
         >
           + Receive Payment
         </button>
       }
     >
       {message && (
-        <div className="mb-5 rounded-xl bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">
+        <div className="toast mb-5 px-4 py-3 text-sm font-semibold">
           {message}
         </div>
       )}
@@ -197,7 +196,7 @@ const Payments = () => {
           return (
             <div
               key={card.label}
-              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+              className="metric-card p-5"
             >
               <Icon className={card.color} size={28} />
               <p className="mt-4 text-sm font-medium text-slate-500">
@@ -211,7 +210,7 @@ const Payments = () => {
         })}
       </div>
 
-      <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-6 metric-card p-5">
         <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-lg font-bold text-slate-900">Due Orders</h2>
@@ -235,7 +234,7 @@ const Payments = () => {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[950px] border-collapse">
+          <table className="shop-table w-full min-w-[950px]">
             <thead>
               <tr className="border-b bg-slate-50 text-left text-sm text-slate-600">
                 <th className="px-4 py-3">Order</th>
@@ -309,7 +308,7 @@ const Payments = () => {
                     <td className="px-4 py-4 text-right">
                       <button
                         onClick={() => openPaymentModal(order)}
-                        className="rounded-xl bg-green-50 px-4 py-2 text-sm font-bold text-green-700 hover:bg-green-100"
+                        className="btn-muted text-sm text-green-700"
                       >
                         Receive Payment
                       </button>
@@ -322,13 +321,13 @@ const Payments = () => {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="metric-card p-5">
         <h2 className="mb-5 text-lg font-bold text-slate-900">
           Payment History
         </h2>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[850px] border-collapse">
+          <table className="shop-table w-full min-w-[850px]">
             <thead>
               <tr className="border-b bg-slate-50 text-left text-sm text-slate-600">
                 <th className="px-4 py-3">Date</th>
@@ -373,7 +372,7 @@ const Payments = () => {
                     </td>
 
                     <td className="px-4 py-4">
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold capitalize text-slate-700">
+                      <span className="status-pill bg-slate-100 text-slate-700">
                         {payment.paymentMode}
                       </span>
                     </td>

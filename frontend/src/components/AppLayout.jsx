@@ -48,11 +48,11 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-100 lg:flex">
-      <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-200 bg-white lg:block">
+    <div className="shop-shell min-h-screen lg:flex">
+      <aside className="shop-sidebar fixed inset-y-0 left-0 hidden w-72 border-r lg:block">
         <div className="flex h-full flex-col">
-          <div className="flex items-center gap-3 border-b border-slate-200 px-6 py-5">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white">
+          <div className="flex items-center gap-3 border-b px-6 py-5" style={{ borderColor: "var(--shop-border)" }}>
+            <div className="brand-mark flex h-12 w-12 items-center justify-center rounded-xl text-white">
               <Store size={26} />
             </div>
 
@@ -63,8 +63,8 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
             /> */}
 
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Shop Manager</h2>
-              <p className="text-xs text-slate-500">Building material shop</p>
+              <h2 className="text-lg font-black text-slate-900">RM Trader</h2>
+              <p className="text-xs font-semibold text-slate-500">Counter, stock and ledger</p>
             </div>
           </div>
 
@@ -77,10 +77,10 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                    `nav-link flex items-center gap-3 px-4 py-3 text-sm font-bold ${
                       isActive
-                        ? "bg-blue-600 text-white shadow-md"
-                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                        ? "nav-link-active"
+                        : "nav-link-idle"
                     }`
                   }
                 >
@@ -91,8 +91,8 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
             })}
           </nav>
 
-          <div className="border-t border-slate-200 p-4">
-            <div className="mb-3 rounded-xl bg-slate-50 p-3">
+          <div className="border-t p-4" style={{ borderColor: "var(--shop-border)" }}>
+            <div className="surface-flat mb-3 p-3">
               <p className="text-sm font-bold text-slate-900">
                 {user?.name || "User"}
               </p>
@@ -101,7 +101,7 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
 
             <button
               onClick={logout}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-600 hover:bg-red-100"
+              className="btn-muted w-full text-sm hover:text-red-700"
             >
               <LogOut size={18} />
               Logout
@@ -111,17 +111,17 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
       </aside>
 
       <div className="min-h-screen flex-1 lg:ml-72">
-        <header className="border-b border-slate-200 bg-white px-6 py-5">
+        <header className="shop-header sticky top-0 z-30 border-b px-6 py-5">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
-                <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
-                {subtitle && <p className="text-sm text-slate-500">{subtitle}</p>}
+                <h1 className="text-2xl font-black text-slate-950">{title}</h1>
+                {subtitle && <p className="mt-1 text-sm font-medium text-slate-500">{subtitle}</p>}
                 </div>
 
                 {headerAction && <div>{headerAction}</div>}
             </div>
         </header>
-        <main className="p-6">{children}</main>
+        <main className="p-5 md:p-6">{children}</main>
       </div>
     </div>
   );

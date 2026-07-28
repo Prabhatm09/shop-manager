@@ -10,6 +10,8 @@ import Orders from "./pages/Orders";
 import Payments from "./pages/Payments";
 import CustomerDetail from "./pages/CustomerDetail";
 import Invoice from "./pages/Invoice";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 
 
@@ -19,6 +21,8 @@ const App = () => {
       <Route path="/" element={<Navigate to="/signin" />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/signin" element={<Signin />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password/:token" element={<ResetPassword />} />
 
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />

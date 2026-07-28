@@ -79,43 +79,50 @@ const fetchStats = async () => {
     label: "Products",
     value: stats.totalProducts,
     icon: Package,
-    color: "text-blue-600",
+    color: "text-[color:var(--shop-info)]",
+    metricColor: "var(--shop-info)",
   },
   {
     label: "Customers",
     value: stats.totalCustomers,
     icon: Users,
-    color: "text-green-600",
+    color: "text-[color:var(--shop-primary)]",
+    metricColor: "var(--shop-primary)",
   },
   {
     label: "Orders",
     value: stats.totalOrders,
     icon: ShoppingCart,
-    color: "text-purple-600",
+    color: "text-[color:var(--shop-brick)]",
+    metricColor: "var(--shop-brick)",
   },
   {
     label: "Total Sales",
     value: `₹${stats.totalSales || 0}`,
     icon: IndianRupee,
-    color: "text-indigo-600",
+    color: "text-[color:var(--shop-info)]",
+    metricColor: "var(--shop-info)",
   },
   {
     label: "Total Paid",
     value: `₹${stats.totalPaid || 0}`,
     icon: IndianRupee,
-    color: "text-green-600",
+    color: "text-[color:var(--shop-primary)]",
+    metricColor: "var(--shop-primary)",
   },
   {
     label: "Total Due",
     value: `₹${stats.totalDueAmount || 0}`,
     icon: IndianRupee,
-    color: "text-red-600",
+    color: "text-[color:var(--shop-brick)]",
+    metricColor: "var(--shop-brick)",
   },
   {
     label: "Low Stock",
     value: stats.lowStockCount || 0,
     icon: Package,
-    color: "text-red-600",
+    color: "text-[color:var(--shop-brick)]",
+    metricColor: "var(--shop-brick)",
    },
 ];
 
@@ -136,20 +143,20 @@ const handleMarkReturned = async (orderId) => {
 };
 
   return (
-    <AppLayout
+  <AppLayout
       title="Dashboard"
-      subtitle="Overview of your building material shop"
+      subtitle="Money, stock and returns at counter speed"
       headerAction={
     <div className="flex items-center gap-3">
     <button
   onClick={() => setQuickSaleOpen(true)}
-  className="bg-green-600 w-full rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white md:w-auto"
+  className="btn-success w-full md:w-auto"
 >
   + Quick Sale
 </button>
    <button
       onClick={() => setIsCreateModalOpen(true)}
-      className="w-full rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700 md:w-auto"
+      className="btn-primary w-full md:w-auto"
     >
       + Create Order
     </button>
@@ -158,6 +165,44 @@ const handleMarkReturned = async (orderId) => {
   }
     >
         
+      <section className="mb-6 grid grid-cols-1 gap-5 xl:grid-cols-[1.25fr_0.9fr]">
+        <div className="bill-panel p-6">
+          <p className="text-sm font-bold text-slate-300">Ledger Position</p>
+          <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
+            <div>
+              <p className="text-xs font-bold uppercase text-slate-400">Sales</p>
+              <h2 className="mt-1 text-3xl font-black">₹{stats.totalSales || 0}</h2>
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase text-slate-400">Received</p>
+              <h2 className="mt-1 text-3xl font-black text-green-200">₹{stats.totalPaid || 0}</h2>
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase text-slate-400">Due</p>
+              <h2 className="mt-1 text-3xl font-black text-orange-200">₹{stats.totalDueAmount || 0}</h2>
+            </div>
+          </div>
+        </div>
+
+        <div className="surface p-6">
+          <p className="text-sm font-bold text-slate-500">Today’s Attention</p>
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            <div className="rounded-xl bg-[color:var(--shop-brick-soft)] p-4">
+              <p className="text-xs font-bold text-red-700">Low Stock</p>
+              <h3 className="mt-1 text-2xl font-black text-red-800">{stats.lowStockCount || 0}</h3>
+            </div>
+            <div className="rounded-xl bg-[color:var(--shop-sand-soft)] p-4">
+              <p className="text-xs font-bold text-yellow-800">Due Today</p>
+              <h3 className="mt-1 text-2xl font-black text-yellow-900">{returnData.dueTodayCount}</h3>
+            </div>
+            <div className="rounded-xl bg-[color:var(--shop-info-soft)] p-4">
+              <p className="text-xs font-bold text-blue-800">Pending</p>
+              <h3 className="mt-1 text-2xl font-black text-blue-900">{orderStats.pending}</h3>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => {
           const Icon = card.icon;
@@ -165,7 +210,8 @@ const handleMarkReturned = async (orderId) => {
           return (
             <div
               key={card.label}
-              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+              className="metric-card p-6"
+              style={{ "--metric-color": card.metricColor }}
             >
               <Icon className={card.color} size={30} />
 
@@ -173,7 +219,7 @@ const handleMarkReturned = async (orderId) => {
                 {card.label}
               </p>
 
-              <h2 className="mt-1 text-3xl font-bold text-slate-900">
+              <h2 className="mt-1 text-3xl font-black text-slate-950">
                 {card.value}
               </h2>
             </div>
@@ -186,28 +232,28 @@ const handleMarkReturned = async (orderId) => {
         </h2>
 
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <div className="rounded-2xl border border-yellow-200 bg-yellow-50 p-5">
+            <div className="surface-flat bg-[color:var(--shop-sand-soft)] p-5">
             <p className="text-sm font-semibold text-yellow-700">Pending</p>
             <h2 className="mt-2 text-2xl font-bold text-yellow-800">
                 {orderStats.pending}
             </h2>
             </div>
 
-            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
+            <div className="surface-flat bg-[color:var(--shop-info-soft)] p-5">
             <p className="text-sm font-semibold text-blue-700">Confirmed</p>
             <h2 className="mt-2 text-2xl font-bold text-blue-800">
                 {orderStats.confirmed}
             </h2>
             </div>
 
-            <div className="rounded-2xl border border-purple-200 bg-purple-50 p-5">
+            <div className="surface-flat bg-[color:var(--shop-panel)] p-5">
             <p className="text-sm font-semibold text-purple-700">Dispatched</p>
             <h2 className="mt-2 text-2xl font-bold text-purple-800">
                 {orderStats.dispatched}
             </h2>
             </div>
 
-            <div className="rounded-2xl border border-green-200 bg-green-50 p-5">
+            <div className="surface-flat bg-[color:var(--shop-primary-soft)] p-5">
             <p className="text-sm font-semibold text-green-700">Delivered</p>
             <h2 className="mt-2 text-2xl font-bold text-green-800">
                 {orderStats.delivered}
@@ -216,7 +262,7 @@ const handleMarkReturned = async (orderId) => {
         </div>
       </div>
 
-      <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="surface mt-8 p-6">
          <div className="mb-5 flex items-center justify-between">
             <div>
             <h2 className="text-lg font-bold text-slate-900">Low Stock Alerts</h2>
@@ -235,7 +281,7 @@ const handleMarkReturned = async (orderId) => {
             {stats.lowStockProducts.map((product) => (
                 <div
                 key={product._id}
-                className="rounded-2xl border border-red-100 bg-red-50 p-4"
+                className="surface-flat bg-[color:var(--shop-brick-soft)] p-4"
                 >
                 <h3 className="font-bold text-slate-900">{product.name}</h3>
 
@@ -265,21 +311,21 @@ const handleMarkReturned = async (orderId) => {
         </div>
 
         <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-3">
-  <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
+  <div className="surface-flat bg-[color:var(--shop-brick-soft)] p-5">
     <p className="text-sm font-semibold text-red-600">Overdue Returns</p>
     <h2 className="mt-2 text-3xl font-bold text-red-700">
       {returnData.overdueCount}
     </h2>
   </div>
 
-  <div className="rounded-2xl border border-yellow-200 bg-yellow-50 p-5">
+  <div className="surface-flat bg-[color:var(--shop-sand-soft)] p-5">
     <p className="text-sm font-semibold text-yellow-700">Due Today</p>
     <h2 className="mt-2 text-3xl font-bold text-yellow-700">
       {returnData.dueTodayCount}
     </h2>
   </div>
 
-  <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
+  <div className="surface-flat bg-[color:var(--shop-info-soft)] p-5">
     <p className="text-sm font-semibold text-blue-700">Pending Returns</p>
     <h2 className="mt-2 text-3xl font-bold text-blue-700">
       {returnData.totalPendingReturns}
@@ -287,7 +333,7 @@ const handleMarkReturned = async (orderId) => {
   </div>
 </div>
 
-<div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+<div className="surface mt-8 p-6">
   <div className="mb-5">
     <h2 className="text-lg font-bold text-slate-900">Return Reminders</h2>
     <p className="text-sm text-slate-500">
@@ -315,7 +361,7 @@ const handleMarkReturned = async (orderId) => {
                 ? "border-red-200 bg-red-50"
                 : isDueToday
                 ? "border-yellow-200 bg-yellow-50"
-                : "border-slate-200 bg-white"
+                : "border-[color:var(--shop-border)] bg-[color:var(--shop-panel)]"
             }`}
           >
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -368,7 +414,7 @@ const handleMarkReturned = async (orderId) => {
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-white p-4 shadow-sm lg:min-w-[220px]">
+              <div className="surface-flat p-4 lg:min-w-[220px]">
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Due Amount</span>
                   <span className="font-bold text-slate-900">
@@ -385,7 +431,7 @@ const handleMarkReturned = async (orderId) => {
 
                 <button
                   onClick={() => handleMarkReturned(item._id)}
-                  className="mt-4 w-full rounded-xl bg-green-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-green-700"
+                  className="btn-success mt-4 w-full text-sm"
                 >
                   Mark Returned
                 </button>

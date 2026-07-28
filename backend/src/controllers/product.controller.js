@@ -66,7 +66,10 @@ const createProduct = async (req, res) => {
 
 const getProducts = async (req, res) => {
   try {
-    const products = await Product.find({ createdBy: req.user._id }).sort({
+    const products = await Product.find({
+      createdBy: req.user._id,
+      isActive: true,
+    }).sort({
       createdAt: -1,
     });
 
@@ -86,6 +89,7 @@ const getLowStockProducts = async (req, res) => {
   try {
     const products = await Product.find({
       createdBy: req.user._id,
+      isActive: true,
       $expr: {
         $lte: ["$currentStock", "$lowStockAlert"],
       },
@@ -130,6 +134,7 @@ const updateProduct = async (req, res) => {
     const allowedFields = {
       name: req.body.name,
       category: req.body.category,
+      subCategory: req.body.subCategory,
       unit: req.body.unit,
       pricePerUnit:
         req.body.pricePerUnit !== undefined
@@ -140,6 +145,8 @@ const updateProduct = async (req, res) => {
           ? Number(req.body.lowStockAlert)
           : undefined,
       description: req.body.description,
+      saleUnits: req.body.saleUnits,
+      quickQuantities: req.body.quickQuantities,
       isActive: req.body.isActive,
     };
 
@@ -306,6 +313,35 @@ const getProductStockMovements = async (req, res) => {
 
 const deleteProduct = async (req, res) => {
   try {
+    const product = await Product.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        createdBy: req.user._id,
+      },
+      { isActive: false },
+      { new: true }
+    );
+
+    if (!product) {
+      return res.status(404).json({
+        message: "Product not found",
+      });
+    }
+
+    return res.json({
+      message: "Product archived successfully",
+      product,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Product archive failed",
+      error: error.message,
+    });
+  }
+};
+
+const permanentlyDeleteProduct = async (req, res) => {
+  try {
     const product = await Product.findOneAndDelete({
       _id: req.params.id,
       createdBy: req.user._id,
@@ -343,4 +379,5 @@ module.exports = {
   adjustStock,
   getProductStockMovements,
   deleteProduct,
+  permanentlyDeleteProduct,
 };

@@ -39,11 +39,11 @@ const Signin = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 via-blue-50 to-slate-200 px-4">
+    <div className="shop-shell min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 p-8">
+        <div className="modal-panel p-8">
           <div className="flex justify-center mb-6">
-            <div className="h-16 w-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg">
+            <div className="brand-mark h-16 w-16 rounded-xl text-white flex items-center justify-center">
               <Store size={34} />
             </div>
           </div>
@@ -74,7 +74,7 @@ const Signin = () => {
                 value={form.email}
                 onChange={handleChange}
                 placeholder="Enter your email"
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                className="form-control px-4 py-3"
               />
             </div>
 
@@ -90,7 +90,7 @@ const Signin = () => {
                   value={form.password}
                   onChange={handleChange}
                   placeholder="Enter password"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 pr-12 text-slate-900 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                  className="form-control px-4 py-3 pr-12"
                 />
 
                 <button
@@ -105,15 +105,21 @@ const Signin = () => {
 
             <button
               disabled={loading}
-              className="w-full rounded-xl bg-blue-600 py-3 font-semibold text-white shadow-lg hover:bg-blue-700 disabled:opacity-60"
+              className="btn-primary w-full py-3"
             >
               {loading ? "Signing in..." : "Sign In"}
             </button>
           </form>
 
+          <div className="mt-4 text-center">
+            <Link to="/forgot-password" className="text-sm font-semibold text-[color:var(--shop-primary)]">
+              Forgot password?
+            </Link>
+          </div>
+
           <p className="mt-6 text-center text-sm text-slate-500">
             New user?{" "}
-            <Link to="/signup" className="font-semibold text-blue-600">
+            <Link to="/signup" className="font-semibold text-[color:var(--shop-primary)]">
               Create Account
             </Link>
           </p>

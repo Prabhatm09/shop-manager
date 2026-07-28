@@ -206,8 +206,8 @@ const QuickSaleModal = ({ open, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="max-h-[94vh] w-full max-w-6xl overflow-hidden rounded-3xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+      <div className="modal-panel max-h-[94vh] w-full max-w-6xl overflow-hidden">
+        <div className="flex items-center justify-between border-b px-6 py-4">
           <div>
             <h2 className="text-xl font-bold text-slate-900">Quick Sale</h2>
             <p className="text-sm text-slate-500">
@@ -218,7 +218,7 @@ const QuickSaleModal = ({ open, onClose }) => {
           <button
             type="button"
             onClick={resetAndClose}
-            className="rounded-xl bg-slate-100 p-2 text-slate-600 hover:bg-slate-200"
+            className="btn-muted p-2"
           >
             <X size={22} />
           </button>
@@ -243,7 +243,7 @@ const QuickSaleModal = ({ open, onClose }) => {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search product..."
-                className="mb-5 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100"
+                className="mb-5 form-control px-4 py-3"
               />
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -259,7 +259,7 @@ const QuickSaleModal = ({ open, onClose }) => {
                     return (
                       <div
                         key={product._id}
-                        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                        className="surface-flat p-4"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -287,7 +287,7 @@ const QuickSaleModal = ({ open, onClose }) => {
                           <button
                             type="button"
                             onClick={() => addProduct(product)}
-                            className="rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700"
+                            className="btn-success text-sm"
                           >
                             Add
                           </button>
@@ -299,7 +299,7 @@ const QuickSaleModal = ({ open, onClose }) => {
               </div>
             </section>
 
-            <aside className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <aside className="surface-flat sticky top-4 self-start p-5">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-lg font-bold text-slate-900">
                   Sale Items
@@ -333,7 +333,7 @@ const QuickSaleModal = ({ open, onClose }) => {
                     return (
                       <div
                         key={`${item.productId}-${index}`}
-                        className="rounded-2xl bg-white p-4 shadow-sm"
+                        className="surface-flat p-4"
                       >
                         <div className="mb-3 flex items-start justify-between gap-3">
                           <div>
@@ -387,7 +387,7 @@ const QuickSaleModal = ({ open, onClose }) => {
                                 <button
                                   type="button"
                                   onClick={() => decreaseQty(index)}
-                                  className="rounded-lg bg-slate-100 p-2 text-slate-700"
+                                  className="btn-muted p-2"
                                 >
                                   <Minus size={15} />
                                 </button>
@@ -409,7 +409,7 @@ const QuickSaleModal = ({ open, onClose }) => {
                                 <button
                                   type="button"
                                   onClick={() => increaseQty(index)}
-                                  className="rounded-lg bg-slate-100 p-2 text-slate-700"
+                                  className="btn-muted p-2"
                                 >
                                   <Plus size={15} />
                                 </button>
@@ -454,7 +454,7 @@ const QuickSaleModal = ({ open, onClose }) => {
                 )}
               </div>
 
-              <div className="mt-5 rounded-2xl bg-slate-900 p-4 text-white">
+              <div className="mt-5 bill-panel p-4">
                 <div className="flex justify-between text-lg">
                   <span>Total</span>
                   <span className="font-bold">₹{totalAmount}</span>
@@ -473,7 +473,7 @@ const QuickSaleModal = ({ open, onClose }) => {
           <button
             type="button"
             onClick={resetAndClose}
-            className="rounded-xl bg-slate-100 px-5 py-3 font-semibold text-slate-700 hover:bg-slate-200"
+            className="btn-muted"
           >
             Cancel
           </button>
@@ -482,7 +482,7 @@ const QuickSaleModal = ({ open, onClose }) => {
             type="button"
             disabled={loading || selectedItems.length === 0}
             onClick={handleSubmit}
-            className="rounded-xl bg-green-600 px-5 py-3 font-semibold text-white hover:bg-green-700 disabled:bg-slate-300"
+            className="btn-success"
           >
             {loading ? "Saving..." : "Complete Quick Sale"}
           </button>

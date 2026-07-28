@@ -1,6 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, IndianRupee, Phone, MapPin, ShoppingCart } from "lucide-react";
+import {
+  ArrowLeft,
+  IndianRupee,
+  Phone,
+  MapPin,
+  ShoppingCart,
+} from "lucide-react";
 import API from "../api/axios";
 import AppLayout from "../components/AppLayout";
 
@@ -9,44 +15,96 @@ const CustomerDetail = () => {
   const navigate = useNavigate();
 
   const [customer, setCustomer] = useState(null);
+  const [summary, setSummary] = useState(null);
   const [orders, setOrders] = useState([]);
   const [payments, setPayments] = useState([]);
   const [message, setMessage] = useState("");
+  const [collectOpen, setCollectOpen] = useState(false);
+  const [collectForm, setCollectForm] = useState({
+    amount: "",
+    paymentMode: "cash",
+    paymentDate: "",
+    notes: "",
+  });
+  const [collectLoading, setCollectLoading] = useState(false);
 
-  const fetchCustomerDetail = async () => {
+  const fetchCustomerDetail = useCallback(async () => {
     try {
-      const [customerRes, orderRes, paymentRes] = await Promise.all([
-        API.get(`/customers/${id}`),
-        API.get(`/orders/customer/${id}`),
-        API.get(`/payments/customer/${id}`),
-      ]);
+      const res = await API.get(`/customers/${id}`);
 
-      setCustomer(customerRes.data.customer);
-      setOrders(orderRes.data.orders || []);
-      setPayments(paymentRes.data.payments || []);
+      setCustomer(res.data.customer);
+      setOrders(res.data.orders || []);
+      setPayments(res.data.payments || []);
+      setSummary(res.data.summary || null);
     } catch (error) {
-      setMessage(error.response?.data?.message || "Failed to load customer detail");
+      setMessage(
+        error.response?.data?.message || "Failed to load customer detail"
+      );
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchCustomerDetail();
-  }, [id]);
+  }, [fetchCustomerDetail]);
 
   const stats = useMemo(() => {
-    const totalPurchase = orders.reduce((sum, order) => sum + Number(order.subTotal || 0), 0);
-    const totalPaidFromOrders = orders.reduce((sum, order) => sum + Number(order.paidAmount || 0), 0);
-    const totalDue = orders.reduce((sum, order) => sum + Number(order.dueAmount || 0), 0);
-    const totalPaymentHistory = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+    const totalSales = orders.reduce(
+      (sum, order) => sum + Number(order.subTotal || 0),
+      0
+    );
+
+    const totalPaid = orders.reduce(
+      (sum, order) => sum + Number(order.paidAmount || 0),
+      0
+    );
+
+     const totalDue = Number(summary?.totalDue || 0);
+     const totalAdvance = Number(summary?.totalAdvance || 0);
+
+    const totalPaymentHistory = payments.reduce(
+      (sum, payment) => sum + Number(payment.amount || 0),
+      0
+    );
 
     return {
-      totalOrders: orders.length,
-      totalPurchase,
-      totalPaidFromOrders,
-      totalDue,
-      totalPaymentHistory,
+     totalOrders: orders.length,
+    totalSales,
+    totalPaid,
+    totalDue,
+    totalAdvance,
+    totalPaymentHistory
     };
-  }, [orders, payments]);
+  }, [orders, payments, summary]);
+
+  const handleCollectPayment = async (e) => {
+  e.preventDefault();
+
+  try {
+    setCollectLoading(true);
+    setMessage("");
+
+    await API.post(`/payments/customer/${id}/collect`, {
+      amount: Number(collectForm.amount),
+      paymentMode: collectForm.paymentMode,
+      paymentDate: collectForm.paymentDate || new Date(),
+      notes: collectForm.notes,
+    });
+
+    setCollectForm({
+      amount: "",
+      paymentMode: "cash",
+      paymentDate: "",
+      notes: "",
+    });
+
+    setCollectOpen(false);
+    fetchCustomerDetail();
+  } catch (error) {
+    setMessage(error.response?.data?.message || "Payment collection failed");
+  } finally {
+    setCollectLoading(false);
+  }
+};
 
   return (
     <AppLayout
@@ -69,26 +127,61 @@ const CustomerDetail = () => {
 
       {customer && (
         <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-2xl font-bold text-slate-900">{customer.name}</h2>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex-1">
+              <h2 className="text-2xl font-bold text-slate-900">
+                {customer.name}
+              </h2>
 
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-            <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-4">
-              <Phone className="text-blue-600" size={20} />
-              <div>
-                <p className="text-xs text-slate-500">Phone</p>
-                <p className="font-bold text-slate-900">{customer.phone}</p>
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-4">
+                  <Phone className="text-blue-600" size={20} />
+                  <div>
+                    <p className="text-xs text-slate-500">Phone</p>
+                    <p className="font-bold text-slate-900">
+                      {customer.phone}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-4 md:col-span-2">
+                  <MapPin className="text-green-600" size={20} />
+                  <div>
+                    <p className="text-xs text-slate-500">Address</p>
+                    <p className="font-bold text-slate-900">
+                      {customer.address || "-"}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-4 md:col-span-2">
-              <MapPin className="text-green-600" size={20} />
-              <div>
-                <p className="text-xs text-slate-500">Address</p>
-                <p className="font-bold text-slate-900">
-                  {customer.address || "-"}
+            {stats.totalDue > 0 ? (
+              <div className="rounded-2xl bg-red-50 p-5 text-left lg:min-w-[230px] lg:text-right">
+                <p className="text-sm font-semibold text-red-600">
+                  Current Due
                 </p>
+                <h3 className="mt-1 text-3xl font-bold text-red-700">
+                  ₹{stats.totalDue}
+                </h3>
+
+                <button
+                  onClick={() => setCollectOpen(true)}
+                  className="mt-4 rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700"
+                >
+                  Collect Payment
+                </button>
               </div>
+              ) : stats.totalAdvance > 0 ? (
+            <div className="rounded-2xl bg-green-50 p-5 text-left lg:min-w-[230px] lg:text-right">
+                <p className="text-sm font-semibold text-green-600">
+                Customer Advance
+                </p>
+                <h3 className="mt-1 text-3xl font-bold text-green-700">
+                ₹{stats.totalAdvance}
+                </h3>
             </div>
+            ) : null}
           </div>
         </section>
       )}
@@ -97,27 +190,33 @@ const CustomerDetail = () => {
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <ShoppingCart className="text-purple-600" />
           <p className="mt-4 text-sm text-slate-500">Total Orders</p>
-          <h3 className="text-2xl font-bold text-slate-900">{stats.totalOrders}</h3>
+          <h3 className="text-2xl font-bold text-slate-900">
+            {stats.totalOrders}
+          </h3>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <IndianRupee className="text-indigo-600" />
-          <p className="mt-4 text-sm text-slate-500">Total Purchase</p>
-          <h3 className="text-2xl font-bold text-slate-900">₹{stats.totalPurchase}</h3>
+          <p className="mt-4 text-sm text-slate-500">Total Sales</p>
+          <h3 className="text-2xl font-bold text-slate-900">
+            ₹{stats.totalSales}
+          </h3>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <IndianRupee className="text-green-600" />
           <p className="mt-4 text-sm text-slate-500">Total Paid</p>
           <h3 className="text-2xl font-bold text-slate-900">
-            ₹{stats.totalPaidFromOrders}
+            ₹{stats.totalPaid}
           </h3>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <IndianRupee className="text-red-600" />
-          <p className="mt-4 text-sm text-slate-500">Total Due</p>
-          <h3 className="text-2xl font-bold text-slate-900">₹{stats.totalDue}</h3>
+          <p className="mt-4 text-sm text-slate-500">Current Due</p>
+          <h3 className="text-2xl font-bold text-slate-900">
+            ₹{stats.totalDue}
+          </h3>
         </div>
       </section>
 
@@ -134,7 +233,10 @@ const CustomerDetail = () => {
               </div>
             ) : (
               orders.map((order) => (
-                <div key={order._id} className="rounded-2xl border border-slate-200 p-5">
+                <div
+                  key={order._id}
+                  className="rounded-2xl border border-slate-200 p-5"
+                >
                   <div className="flex justify-between gap-4">
                     <div>
                       <p className="text-sm text-slate-500">
@@ -159,10 +261,14 @@ const CustomerDetail = () => {
                   </div>
 
                   <div className="mt-4 border-t border-slate-100 pt-3">
-                    {order.items.map((item, index) => (
-                      <div key={index} className="flex justify-between py-1 text-sm">
+                    {order.items?.map((item, index) => (
+                      <div
+                        key={index}
+                        className="flex justify-between py-1 text-sm"
+                      >
                         <span className="text-slate-600">
-                          {item.productName} × {item.quantity} {item.unit}
+                          {item.productName} × {item.quantity}{" "}
+                          {item.selectedUnit || item.unit}
                         </span>
                         <span className="font-semibold text-slate-900">
                           ₹{item.total}
@@ -171,15 +277,92 @@ const CustomerDetail = () => {
                     ))}
                   </div>
 
+                  {order.ledger && (
+                    <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-5">
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500">
+                          Previous Due
+                        </p>
+                        <p className="mt-1 font-bold text-orange-700">
+                          ₹{order.ledger.previousDue}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500">
+                          New Bill
+                        </p>
+                        <p className="mt-1 font-bold text-slate-900">
+                          ₹{order.ledger.newBill}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500">
+                          Total Payable
+                        </p>
+                        <p className="mt-1 font-bold text-blue-700">
+                          ₹{order.ledger.totalPayable}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500">
+                          Paid Now
+                        </p>
+                        <p className="mt-1 font-bold text-green-700">
+                          ₹{order.ledger.paidNow}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500">
+                          Balance
+                        </p>
+                       <p
+                        className={`mt-1 font-bold ${
+                            order.ledger.balanceAfterOrder > 0
+                            ? "text-red-700"
+                            : order.ledger.balanceAfterOrder < 0
+                            ? "text-green-700"
+                            : "text-slate-900"
+                        }`}
+                        >
+                        {order.ledger.balanceAfterOrder > 0
+                            ? `Due ₹${order.ledger.dueAfterOrder}`
+                            : order.ledger.balanceAfterOrder < 0
+                            ? `Advance ₹${order.ledger.advanceAfterOrder}`
+                            : "Clear ₹0"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {order.ledger.previousAdvance > 0 && (
+                    <div>
+                        <p className="text-xs font-semibold text-slate-500">
+                        Previous Advance
+                        </p>
+                        <p className="mt-1 font-bold text-green-700">
+                        ₹{order.ledger.previousAdvance}
+                        </p>
+                    </div>
+                    )}
+
                   <div className="mt-4 grid grid-cols-3 gap-3 rounded-xl bg-slate-50 p-3 text-sm">
                     <div>
                       <p className="text-slate-500">Paid</p>
-                      <p className="font-bold text-green-700">₹{order.paidAmount}</p>
+                      <p className="font-bold text-green-700">
+                        ₹{order.paidAmount}
+                      </p>
                     </div>
+
                     <div>
                       <p className="text-slate-500">Due</p>
-                      <p className="font-bold text-red-700">₹{order.dueAmount}</p>
+                      <p className="font-bold text-red-700">
+                        ₹{order.dueAmount}
+                      </p>
                     </div>
+
                     <div>
                       <p className="text-slate-500">Return</p>
                       <p className="font-bold text-slate-900">
@@ -207,7 +390,10 @@ const CustomerDetail = () => {
               </div>
             ) : (
               payments.map((payment) => (
-                <div key={payment._id} className="rounded-2xl border border-slate-200 p-5">
+                <div
+                  key={payment._id}
+                  className="rounded-2xl border border-slate-200 p-5"
+                >
                   <div className="flex justify-between gap-4">
                     <div>
                       <h3 className="font-bold text-slate-900">
@@ -234,6 +420,150 @@ const CustomerDetail = () => {
           </div>
         </section>
       </div>
+      {collectOpen && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+    <div className="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+      <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">
+            Collect Payment
+          </h2>
+          <p className="text-sm text-slate-500">
+            Receive payment from {customer?.name}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setCollectOpen(false)}
+          className="rounded-xl bg-slate-100 px-3 py-2 font-bold text-slate-600"
+        >
+          X
+        </button>
+      </div>
+
+      <form onSubmit={handleCollectPayment}>
+        <div className="space-y-4 p-6">
+          <div className="rounded-2xl bg-red-50 p-4">
+            <p className="text-sm font-semibold text-red-600">
+              Current Total Due
+            </p>
+            <h3 className="text-3xl font-bold text-red-700">
+              ₹{stats.totalDue}
+            </h3>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              Amount Received
+            </label>
+            <input
+              type="number"
+              value={collectForm.amount}
+              onChange={(e) =>
+                setCollectForm({
+                  ...collectForm,
+                  amount: e.target.value,
+                })
+              }
+              placeholder="Enter amount"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100"
+            />
+
+            <button
+              type="button"
+              onClick={() =>
+                setCollectForm({
+                  ...collectForm,
+                  amount: stats.totalDue,
+                })
+              }
+              className="mt-2 rounded-lg bg-green-50 px-3 py-2 text-xs font-bold text-green-700"
+            >
+              Fill Full Due ₹{stats.totalDue}
+            </button>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              Payment Mode
+            </label>
+            <select
+              value={collectForm.paymentMode}
+              onChange={(e) =>
+                setCollectForm({
+                  ...collectForm,
+                  paymentMode: e.target.value,
+                })
+              }
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100"
+            >
+              <option value="cash">Cash</option>
+              <option value="upi">UPI</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              Payment Date
+            </label>
+            <input
+              type="date"
+              value={collectForm.paymentDate}
+              onChange={(e) =>
+                setCollectForm({
+                  ...collectForm,
+                  paymentDate: e.target.value,
+                })
+              }
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              Notes
+            </label>
+            <textarea
+              rows="3"
+              value={collectForm.notes}
+              onChange={(e) =>
+                setCollectForm({
+                  ...collectForm,
+                  notes: e.target.value,
+                })
+              }
+              placeholder="Example: Final payment received"
+              className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+          <button
+            type="button"
+            onClick={() => setCollectOpen(false)}
+            className="rounded-xl bg-slate-100 px-5 py-3 font-semibold text-slate-700"
+          >
+            Cancel
+          </button>
+
+          <button
+            disabled={
+              collectLoading ||
+              !collectForm.amount ||
+              Number(collectForm.amount) <= 0 ||
+              Number(collectForm.amount) > Number(stats.totalDue)
+            }
+            className="rounded-xl bg-green-600 px-5 py-3 font-semibold text-white hover:bg-green-700 disabled:bg-slate-300"
+          >
+            {collectLoading ? "Saving..." : "Collect Payment"}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+)}
     </AppLayout>
   );
 };

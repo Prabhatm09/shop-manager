@@ -50,6 +50,31 @@ const productSchema = new mongoose.Schema(
       trim: true,
     },
 
+    saleUnits: [
+      {
+        unit: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        conversionToBase: {
+          type: Number,
+          default: 1,
+          min: 0,
+        },
+        pricePerUnit: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+      },
+    ],
+
+    quickQuantities: {
+      type: [Number],
+      default: [],
+    },
+
     isActive: {
       type: Boolean,
       default: true,

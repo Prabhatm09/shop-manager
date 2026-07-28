@@ -1,13 +1,5 @@
 import { X } from "lucide-react";
 
-const initialPaymentForm = {
-  orderId: "",
-  amount: "",
-  paymentMode: "cash",
-  paymentDate: "",
-  notes: "",
-};
-
 const PaymentFormModal = ({
   open,
   onClose,
@@ -42,8 +34,8 @@ const PaymentFormModal = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+      <div className="modal-panel max-h-[92vh] w-full max-w-2xl overflow-hidden">
+        <div className="flex items-center justify-between border-b px-6 py-4">
           <div>
             <h2 className="text-xl font-bold text-slate-900">
               Receive Payment
@@ -56,7 +48,7 @@ const PaymentFormModal = ({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl bg-slate-100 p-2 text-slate-600 hover:bg-slate-200"
+            className="btn-muted p-2"
           >
             <X size={22} />
           </button>
@@ -66,7 +58,7 @@ const PaymentFormModal = ({
           <div className="max-h-[65vh] overflow-y-auto p-6">
             <div className="space-y-4">
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                <label className="field-label">
                   Due Order
                 </label>
 
@@ -74,7 +66,7 @@ const PaymentFormModal = ({
                   name="orderId"
                   value={form.orderId}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100"
+                  className="form-control px-4 py-3"
                 >
                   <option value="">Choose due order</option>
                   {orders.map((order) => (
@@ -132,7 +124,7 @@ const PaymentFormModal = ({
                   <button
                     type="button"
                     onClick={fillFullDue}
-                    className="mt-4 rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-900 hover:bg-slate-100"
+                    className="mt-4 btn-muted text-sm"
                   >
                     Fill Full Due ₹{selectedOrder.dueAmount}
                   </button>
@@ -140,7 +132,7 @@ const PaymentFormModal = ({
               )}
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                <label className="field-label">
                   Payment Amount
                 </label>
                 <input
@@ -164,14 +156,14 @@ const PaymentFormModal = ({
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                <label className="field-label">
                   Payment Mode
                 </label>
                 <select
                   name="paymentMode"
                   value={form.paymentMode}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100"
+                  className="form-control px-4 py-3"
                 >
                   <option value="cash">Cash</option>
                   <option value="upi">UPI</option>
@@ -182,7 +174,7 @@ const PaymentFormModal = ({
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                <label className="field-label">
                   Payment Date
                 </label>
                 <input
@@ -190,12 +182,12 @@ const PaymentFormModal = ({
                   value={form.paymentDate}
                   onChange={handleChange}
                   type="date"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100"
+                  className="form-control px-4 py-3"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                <label className="field-label">
                   Notes
                 </label>
                 <textarea
@@ -204,24 +196,24 @@ const PaymentFormModal = ({
                   onChange={handleChange}
                   rows="3"
                   placeholder="Example: Remaining payment received"
-                  className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100"
+                  className="form-control resize-none px-4 py-3"
                 />
               </div>
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+          <div className="flex justify-end gap-3 border-t px-6 py-4">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl bg-slate-100 px-5 py-3 font-semibold text-slate-700 hover:bg-slate-200"
+              className="btn-muted"
             >
               Cancel
             </button>
 
             <button
               disabled={loading || isAmountInvalid || !form.orderId || !form.amount}
-              className="rounded-xl bg-green-600 px-5 py-3 font-semibold text-white hover:bg-green-700 disabled:bg-slate-300"
+              className="btn-success"
             >
               {loading ? "Saving..." : "Receive Payment"}
             </button>
@@ -232,5 +224,4 @@ const PaymentFormModal = ({
   );
 };
 
-export { initialPaymentForm };
 export default PaymentFormModal;

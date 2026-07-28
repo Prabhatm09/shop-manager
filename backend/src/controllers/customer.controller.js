@@ -1,4 +1,6 @@
 const Customer = require("../models/Customer");
+const Order = require("../models/Order");
+const Payment = require("../models/Payment");
 
 const createCustomer = async (req, res) => {
   try {
@@ -15,6 +17,7 @@ const createCustomer = async (req, res) => {
       phone,
       address: address || "",
       openingDue: Number(openingDue || 0),
+      openingDuePaid: 0,
       notes: notes || "",
       createdBy: req.user._id,
     });
@@ -62,10 +65,82 @@ const getCustomerById = async (req, res) => {
       });
     }
 
-    return res.json({ customer });
+    const orders = await Order.find({
+      customer: customer._id,
+      createdBy: req.user._id,
+    }).sort({ createdAt: 1 });
+
+    const payments = await Payment.find({
+      customer: customer._id,
+      createdBy: req.user._id,
+    })
+      .populate("order", "_id subTotal dueAmount paymentStatus")
+      .sort({ paymentDate: -1 });
+
+     let runningBalance =
+       Number(customer.openingDue || 0) - Number(customer.openingDuePaid || 0);
+
+    const ordersWithLedger = orders.map((order) => {
+    const previousBalance = runningBalance;
+    const previousDue = previousBalance > 0 ? previousBalance : 0;
+    const previousAdvance = previousBalance < 0 ? Math.abs(previousBalance) : 0;
+
+    const newBill = Number(order.subTotal || 0);
+    const paidNow = Number(order.paidAmount || 0);
+
+    const totalPayable = Math.max(newBill + previousDue - previousAdvance, 0);
+
+    runningBalance = previousBalance + newBill - paidNow;
+
+    const balanceAfterOrder = runningBalance;
+    const dueAfterOrder = balanceAfterOrder > 0 ? balanceAfterOrder : 0;
+    const advanceAfterOrder =
+        balanceAfterOrder < 0 ? Math.abs(balanceAfterOrder) : 0;
+
+    return {
+        ...order.toObject(),
+        ledger: {
+        previousDue,
+        previousAdvance,
+        newBill,
+        totalPayable,
+        paidNow,
+        balanceAfterOrder,
+        dueAfterOrder,
+        advanceAfterOrder,
+        },
+    };
+    });
+
+    const totalSales = orders.reduce(
+      (sum, order) => sum + Number(order.subTotal || 0),
+      0
+    );
+
+    const totalPaid =
+      Number(customer.openingDuePaid || 0) +
+      orders.reduce((sum, order) => sum + Number(order.paidAmount || 0), 0);
+
+   const currentDue = runningBalance > 0 ? runningBalance : 0;
+   const currentAdvance = runningBalance < 0 ? Math.abs(runningBalance) : 0;
+
+    return res.json({
+      customer,
+      summary: {
+        totalOrders: orders.length,
+        openingDue: Number(customer.openingDue || 0),
+        openingDuePaid: Number(customer.openingDuePaid || 0),
+        totalSales,
+        totalPaid,
+        totalDue: currentDue,
+        totalAdvance: currentAdvance,
+      },
+      orders: ordersWithLedger.reverse(),
+      payments,
+    });
   } catch (error) {
     return res.status(500).json({
-      message: "Failed to fetch customer",
+      message: "Failed to fetch customer details",
       error: error.message,
     });
   }

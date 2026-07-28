@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Search } from "lucide-react";
+import { FileText, Search, ShoppingCart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import API from "../api/axios";
 import AppLayout from "../components/AppLayout";
@@ -29,7 +29,7 @@ const orderStatusConfig = {
   },
   confirmed: {
     label: "Confirmed",
-    className: "bg-blue-100 text-blue-700 border-blue-200",
+    className: "bg-[color:var(--shop-info-soft)] text-[color:var(--shop-primary-strong)] border-[color:var(--shop-info)]",
   },
   dispatched: {
     label: "Dispatched",
@@ -110,17 +110,17 @@ const filteredOrders = useMemo(() => {
         </div>
       )}
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="surface overflow-hidden">
+        <div className="flex flex-col gap-4 border-b px-5 py-5 lg:flex-row lg:items-center lg:justify-between" style={{ borderColor: "var(--shop-border)" }}>
           <div className="flex flex-wrap gap-2">
             {tabs.map((tab) => (
               <button
                 key={tab.value}
                 onClick={() => setActiveTab(tab.value)}
-                className={`rounded-xl px-4 py-2 text-sm font-bold ${
+                className={`rounded-lg px-4 py-2 text-sm font-bold ${
                   activeTab === tab.value
-                    ? "bg-blue-600 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    ? "bg-[color:var(--shop-primary)] text-white"
+                    : "bg-[color:var(--shop-panel-2)] text-slate-600 hover:bg-[color:var(--shop-primary-soft)]"
                 }`}
               >
                 {tab.label}
@@ -137,26 +137,28 @@ const filteredOrders = useMemo(() => {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search customer or item..."
-              className="w-full rounded-xl border border-slate-300 py-3 pl-11 pr-4 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+              className="form-control py-3 pl-11 pr-4"
             />
           </div>
         </div>
 
+        <div className="px-5 pb-5 pt-4">
+          <div className="overflow-hidden rounded-xl border" style={{ borderColor: "var(--shop-border)" }}>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1050px] border-collapse">
+          <table className="shop-table w-full min-w-[1050px]">
             <thead>
-              <tr className="border-b bg-slate-50 text-left text-sm text-slate-600">
-                <th className="px-4 py-3">Order</th>
-                <th className="px-4 py-3">Customer</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Items</th>
-                <th className="px-4 py-3 text-right">Total</th>
-                <th className="px-4 py-3 text-right">Paid</th>
-                <th className="px-4 py-3 text-right">Due</th>
-                <th className="px-4 py-3">Payment</th>
-                <th className="px-4 py-3">Order Status</th>
-                <th className="px-4 py-3">Return</th>
-                <th className="px-4 py-3 text-right">Action</th>
+              <tr className="text-left">
+                <th className="px-5 py-3.5">Order</th>
+                <th className="px-5 py-3.5">Customer</th>
+                <th className="px-5 py-3.5">Type</th>
+                <th className="px-5 py-3.5">Items</th>
+                <th className="px-5 py-3.5 text-right">Total</th>
+                <th className="px-5 py-3.5 text-right">Paid</th>
+                <th className="px-5 py-3.5 text-right">Due</th>
+                <th className="px-5 py-3.5">Payment</th>
+                <th className="px-5 py-3.5">Order Status</th>
+                <th className="px-5 py-3.5">Return</th>
+                <th className="px-5 py-3.5 text-right">Action</th>
               </tr>
             </thead>
 
@@ -164,19 +166,29 @@ const filteredOrders = useMemo(() => {
               {filteredOrders.length === 0 ? (
                 <tr>
                   <td
-                    colSpan="10"
-                    className="px-4 py-10 text-center text-slate-500"
+                    colSpan="11"
+                    className="bg-[color:var(--shop-panel)] px-6 py-16"
                   >
-                    No orders found.
+                    <div className="mx-auto flex max-w-md flex-col items-center text-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--shop-primary-soft)] text-[color:var(--shop-primary)]">
+                        <ShoppingCart size={24} />
+                      </div>
+                      <h3 className="mt-4 text-base font-black text-slate-900">
+                        No orders found
+                      </h3>
+                      <p className="mt-1 text-sm font-medium text-slate-500">
+                        New sale and rental bills will appear here after you create an order.
+                      </p>
+                    </div>
                   </td>
                 </tr>
               ) : (
                 filteredOrders.map((order) => (
                   <tr
                     key={order._id}
-                    className="border-b text-sm hover:bg-slate-50"
+                    className="text-sm"
                   >
-                    <td className="px-4 py-4">
+                    <td className="px-5 py-4">
                       <p className="font-bold text-slate-900">
                         #{order._id.slice(-6).toUpperCase()}
                       </p>
@@ -185,7 +197,7 @@ const filteredOrders = useMemo(() => {
                       </p>
                     </td>
 
-                    <td className="px-4 py-4">
+                    <td className="px-5 py-4">
                       <p className="font-semibold text-slate-900">
                         {order.customerName}
                       </p>
@@ -194,19 +206,19 @@ const filteredOrders = useMemo(() => {
                       </p>
                     </td>
 
-                    <td className="px-4 py-4">
+                    <td className="px-5 py-4">
                       <span
                         className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase ${
                           order.orderType === "rental"
                             ? "bg-orange-100 text-orange-700"
-                            : "bg-blue-100 text-blue-700"
+                            : "bg-[color:var(--shop-info-soft)] text-[color:var(--shop-primary-strong)]"
                         }`}
                       >
                         {order.orderType === "rental" ? "Rental" : "Sale"}
                       </span>
                     </td>
 
-                    <td className="px-4 py-4">
+                    <td className="px-5 py-4">
                       <div className="space-y-1">
                         {order.items?.slice(0, 2).map((item, index) => (
                           <p key={index} className="text-slate-600">
@@ -215,26 +227,26 @@ const filteredOrders = useMemo(() => {
                         ))}
 
                         {order.items?.length > 2 && (
-                          <p className="text-xs font-semibold text-blue-600">
+                          <p className="text-xs font-semibold text-[color:var(--shop-primary)]">
                             +{order.items.length - 2} more
                           </p>
                         )}
                       </div>
                     </td>
 
-                    <td className="px-4 py-4 text-right font-bold text-slate-900">
+                    <td className="px-5 py-4 text-right font-bold text-slate-900">
                       ₹{order.subTotal}
                     </td>
 
-                    <td className="px-4 py-4 text-right font-bold text-green-700">
+                    <td className="px-5 py-4 text-right font-bold text-green-700">
                       ₹{order.paidAmount}
                     </td>
 
-                    <td className="px-4 py-4 text-right font-bold text-red-700">
+                    <td className="px-5 py-4 text-right font-bold text-red-700">
                       ₹{order.dueAmount}
                     </td>
 
-                    <td className="px-4 py-4">
+                    <td className="px-5 py-4">
                       <span
                         className={`inline-flex rounded-full px-3 py-1 text-xs font-bold capitalize ${
                           order.paymentStatus === "paid"
@@ -247,7 +259,7 @@ const filteredOrders = useMemo(() => {
                         {order.paymentStatus}
                       </span>
                     </td>
-                  <td className="px-4 py-4">
+                  <td className="px-5 py-4">
   <div className="space-y-2">
     <span
       className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${
@@ -260,7 +272,7 @@ const filteredOrders = useMemo(() => {
     <select
       value={order.orderStatus || "pending"}
       onChange={(e) => handleStatusChange(order._id, e.target.value)}
-      className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-blue-600"
+      className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-[color:var(--shop-primary)]"
     >
       {orderStatusOptions.map((status) => (
         <option key={status} value={status}>
@@ -282,7 +294,7 @@ const filteredOrders = useMemo(() => {
               key={status}
               title={orderStatusConfig[status].label}
               className={`h-2 flex-1 rounded-full ${
-                isDone ? "bg-blue-600" : "bg-slate-200"
+                isDone ? "bg-[color:var(--shop-primary)]" : "bg-slate-200"
               }`}
             />
           );
@@ -292,7 +304,7 @@ const filteredOrders = useMemo(() => {
   </div>
 </td>
 
-                    <td className="px-4 py-4">
+                    <td className="px-5 py-4">
                       {order.orderType === "rental" ? (
                         <div>
                           <p className="font-semibold text-orange-700">
@@ -311,10 +323,10 @@ const filteredOrders = useMemo(() => {
                       )}
                     </td>
 
-                    <td className="px-4 py-4 text-right">
+                    <td className="px-5 py-4 text-right">
                       <button
                         onClick={() => navigate(`/orders/${order._id}/invoice`)}
-                        className="inline-flex items-center gap-2 rounded-xl bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-100"
+                        className="btn-muted text-sm text-[color:var(--shop-primary-strong)]"
                       >
                         <FileText size={16} />
                         Invoice
@@ -325,6 +337,8 @@ const filteredOrders = useMemo(() => {
               )}
             </tbody>
           </table>
+        </div>
+          </div>
         </div>
       </div>
     </AppLayout>

@@ -6,9 +6,31 @@ const getDashboardStats = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const totalProducts = await Product.countDocuments({ createdBy: userId });
+    const totalProducts = await Product.countDocuments({
+      createdBy: userId,
+      isActive: true,
+    });
     const totalCustomers = await Customer.countDocuments({ createdBy: userId });
     const totalOrders = await Order.countDocuments({ createdBy: userId });
+    const customers = await Customer.find({ createdBy: userId }).select(
+      "openingDue openingDuePaid"
+    );
+
+    const openingDueBalance = customers.reduce((sum, customer) => {
+      return (
+        sum +
+        Math.max(
+          Number(customer.openingDue || 0) -
+            Number(customer.openingDuePaid || 0),
+          0
+        )
+      );
+    }, 0);
+
+    const openingDuePaid = customers.reduce(
+      (sum, customer) => sum + Number(customer.openingDuePaid || 0),
+      0
+    );
 
     const orderStats = await Order.aggregate([
       { $match: { createdBy: userId } },
@@ -24,6 +46,7 @@ const getDashboardStats = async (req, res) => {
 
     const lowStockProducts = await Product.find({
       createdBy: userId,
+      isActive: true,
       $expr: {
         $lte: ["$currentStock", "$lowStockAlert"],
       },
@@ -43,8 +66,8 @@ const getDashboardStats = async (req, res) => {
       totalCustomers,
       totalOrders,
       totalSales: stats.totalSales,
-      totalPaid: stats.totalPaid,
-      totalDueAmount: stats.totalDue,
+      totalPaid: Number(stats.totalPaid || 0) + openingDuePaid,
+      totalDueAmount: Number(stats.totalDue || 0) + openingDueBalance,
       lowStockCount: lowStockProducts.length,
       lowStockProducts,
     });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Printer } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import API from "../api/axios";
@@ -10,18 +10,18 @@ const Invoice = () => {
   const [order, setOrder] = useState(null);
   const [message, setMessage] = useState("");
 
-  const fetchOrder = async () => {
+  const fetchOrder = useCallback(async () => {
     try {
       const res = await API.get(`/orders/${id}`);
       setOrder(res.data.order);
     } catch (error) {
       setMessage(error.response?.data?.message || "Failed to load invoice");
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchOrder();
-  }, [id]);
+  }, [fetchOrder]);
 
   const handlePrint = () => {
     window.print();
@@ -57,7 +57,7 @@ const Invoice = () => {
 
           <button
             onClick={handlePrint}
-            className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 font-semibold text-white hover:bg-blue-700"
+            className="flex items-center gap-2 rounded-xl bg-[color:var(--shop-primary)] px-5 py-2 font-semibold text-white hover:bg-[color:var(--shop-primary-strong)]"
           >
             <Printer size={18} />
             Print Bill
@@ -80,7 +80,7 @@ const Invoice = () => {
               </div>
 
               <div className="text-right">
-                <h2 className="text-2xl font-bold text-blue-600">INVOICE</h2>
+                <h2 className="text-2xl font-bold text-[color:var(--shop-primary)]">INVOICE</h2>
                 <p className="mt-2 text-sm text-slate-600">
                   Bill No: #{order._id.slice(-6).toUpperCase()}
                 </p>
@@ -147,7 +147,7 @@ const Invoice = () => {
                     {item.productName}
                   </td>
                   <td className="border border-slate-300 px-4 py-3 capitalize">
-                    {item.unit}
+                    {item.selectedUnit || item.unit}
                   </td>
                   <td className="border border-slate-300 px-4 py-3 text-right">
                     {item.quantity}
@@ -165,8 +165,17 @@ const Invoice = () => {
 
           <div className="mt-6 flex justify-end">
             <div className="w-full max-w-sm space-y-3">
+              {Number(order.deliveryCharge || 0) > 0 && (
+                <div className="flex justify-between border-b border-slate-200 pb-2">
+                  <span className="text-slate-600">Delivery Charge</span>
+                  <span className="font-bold text-slate-900">
+                    ₹{order.deliveryCharge}
+                  </span>
+                </div>
+              )}
+
               <div className="flex justify-between border-b border-slate-200 pb-2">
-                <span className="text-slate-600">Subtotal</span>
+                <span className="text-slate-600">Grand Total</span>
                 <span className="font-bold text-slate-900">
                   ₹{order.subTotal}
                 </span>

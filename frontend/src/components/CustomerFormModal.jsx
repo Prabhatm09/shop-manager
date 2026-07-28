@@ -1,13 +1,5 @@
 import { X } from "lucide-react";
 
-const initialCustomerForm = {
-  name: "",
-  phone: "",
-  address: "",
-  openingDue: "",
-  notes: "",
-};
-
 const CustomerFormModal = ({
   open,
   onClose,
@@ -34,8 +26,8 @@ const CustomerFormModal = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+      <div className="modal-panel max-h-[92vh] w-full max-w-2xl overflow-hidden">
+        <div className="flex items-center justify-between border-b px-6 py-4">
           <div>
             <h2 className="text-xl font-bold text-slate-900">
               {editingId ? "Edit Customer" : "Add Customer"}
@@ -47,7 +39,7 @@ const CustomerFormModal = ({
 
           <button
             onClick={handleClose}
-            className="rounded-xl bg-slate-100 p-2 text-slate-600 hover:bg-slate-200"
+            className="btn-muted p-2"
           >
             <X size={22} />
           </button>
@@ -57,7 +49,7 @@ const CustomerFormModal = ({
           <div className="max-h-[65vh] overflow-y-auto p-6">
             <div className="space-y-4">
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                <label className="field-label">
                   Customer Name
                 </label>
                 <input
@@ -65,12 +57,12 @@ const CustomerFormModal = ({
                   value={form.name}
                   onChange={handleChange}
                   placeholder="Example: Ramesh Kumar"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100"
+                  className="form-control px-4 py-3"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                <label className="field-label">
                   Phone Number
                 </label>
                 <input
@@ -78,12 +70,12 @@ const CustomerFormModal = ({
                   value={form.phone}
                   onChange={handleChange}
                   placeholder="9876543210"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100"
+                  className="form-control px-4 py-3"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                <label className="field-label">
                   Address
                 </label>
                 <textarea
@@ -92,12 +84,12 @@ const CustomerFormModal = ({
                   onChange={handleChange}
                   rows="3"
                   placeholder="Customer address"
-                  className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100"
+                  className="form-control resize-none px-4 py-3"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                <label className="field-label">
                   Opening Due Amount
                 </label>
                 <input
@@ -106,12 +98,12 @@ const CustomerFormModal = ({
                   onChange={handleChange}
                   type="number"
                   placeholder="5000"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100"
+                  className="form-control px-4 py-3"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                <label className="field-label">
                   Notes
                 </label>
                 <textarea
@@ -120,24 +112,24 @@ const CustomerFormModal = ({
                   onChange={handleChange}
                   rows="3"
                   placeholder="Optional notes"
-                  className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100"
+                  className="form-control resize-none px-4 py-3"
                 />
               </div>
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+          <div className="flex justify-end gap-3 border-t px-6 py-4">
             <button
               type="button"
               onClick={handleClose}
-              className="rounded-xl bg-slate-100 px-5 py-3 font-semibold text-slate-700 hover:bg-slate-200"
+              className="btn-muted"
             >
               Cancel
             </button>
 
             <button
               disabled={loading}
-              className="rounded-xl bg-green-600 px-5 py-3 font-semibold text-white hover:bg-green-700 disabled:bg-slate-300"
+              className="btn-success"
             >
               {loading
                 ? "Saving..."
@@ -152,5 +144,4 @@ const CustomerFormModal = ({
   );
 };
 
-export { initialCustomerForm };
 export default CustomerFormModal;

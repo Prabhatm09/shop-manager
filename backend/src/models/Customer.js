@@ -26,6 +26,12 @@ const customerSchema = new mongoose.Schema(
       min: 0,
     },
 
+    openingDuePaid: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
     notes: {
       type: String,
       default: "",

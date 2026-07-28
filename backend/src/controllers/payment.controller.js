@@ -1,5 +1,6 @@
 const Payment = require("../models/Payment");
 const Order = require("../models/Order");
+const Customer = require("../models/Customer");
 
 const getPaymentStatus = (subTotal, paidAmount) => {
   if (paidAmount <= 0) return "unpaid";
@@ -144,9 +145,133 @@ const getPaymentsByCustomer = async (req, res) => {
   }
 };
 
+const collectCustomerPayment = async (req, res) => {
+  try {
+    const { amount, paymentMode = "cash", paymentDate, notes } = req.body;
+
+    let remainingAmount = Number(amount || 0);
+
+    if (remainingAmount <= 0) {
+      return res.status(400).json({
+        message: "Payment amount must be greater than 0",
+      });
+    }
+
+    const customer = await Customer.findOne({
+      _id: req.params.customerId,
+      createdBy: req.user._id,
+    });
+
+    if (!customer) {
+      return res.status(404).json({
+        message: "Customer not found",
+      });
+    }
+
+    const openingDueOutstanding = Math.max(
+      Number(customer.openingDue || 0) - Number(customer.openingDuePaid || 0),
+      0
+    );
+
+    const dueOrders = await Order.find({
+      customer: customer._id,
+      createdBy: req.user._id,
+      dueAmount: { $gt: 0 },
+    }).sort({ createdAt: 1 });
+
+    if (openingDueOutstanding <= 0 && dueOrders.length === 0) {
+      return res.status(400).json({
+        message: "No due orders found for this customer",
+      });
+    }
+
+    const totalDue =
+      openingDueOutstanding +
+      dueOrders.reduce((sum, order) => sum + Number(order.dueAmount || 0), 0);
+
+    if (remainingAmount > totalDue) {
+      return res.status(400).json({
+        message: `Payment cannot be greater than total due ₹${totalDue}`,
+      });
+    }
+
+    const paymentRecords = [];
+
+    if (openingDueOutstanding > 0 && remainingAmount > 0) {
+      const appliedAmount = Math.min(remainingAmount, openingDueOutstanding);
+
+      customer.openingDuePaid =
+        Number(customer.openingDuePaid || 0) + appliedAmount;
+      await customer.save();
+
+      const payment = await Payment.create({
+        customer: customer._id,
+        customerName: customer.name,
+        order: null,
+        amount: appliedAmount,
+        paymentMode,
+        paymentDate: paymentDate || new Date(),
+        notes: notes || "Customer payment adjusted against opening due",
+        createdBy: req.user._id,
+      });
+
+      paymentRecords.push(payment);
+      remainingAmount -= appliedAmount;
+    }
+
+    for (const order of dueOrders) {
+      if (remainingAmount <= 0) break;
+
+      const orderDue = Number(order.dueAmount || 0);
+      const appliedAmount = Math.min(remainingAmount, orderDue);
+
+      order.paidAmount = Number(order.paidAmount || 0) + appliedAmount;
+      order.dueAmount = Math.max(orderDue - appliedAmount, 0);
+
+      if (order.dueAmount === 0) {
+        order.paymentStatus = "paid";
+      } else {
+        order.paymentStatus = "partial";
+      }
+
+      await order.save();
+
+      const payment = await Payment.create({
+        customer: customer._id,
+        customerName: customer.name,
+        order: order._id,
+        amount: appliedAmount,
+        paymentMode,
+        paymentDate: paymentDate || new Date(),
+        notes:
+          notes ||
+          `Customer ledger payment adjusted against order #${order._id
+            .toString()
+            .slice(-6)
+            .toUpperCase()}`,
+        createdBy: req.user._id,
+      });
+
+      paymentRecords.push(payment);
+      remainingAmount -= appliedAmount;
+    }
+
+    return res.status(201).json({
+      message: "Customer payment collected successfully",
+      payments: paymentRecords,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Customer payment collection failed",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createPayment,
   getPayments,
   getPaymentsByOrder,
   getPaymentsByCustomer,
+  collectCustomerPayment,
 };

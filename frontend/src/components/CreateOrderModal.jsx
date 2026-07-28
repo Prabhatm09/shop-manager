@@ -49,7 +49,7 @@ const getSaleUnitOptions = (product) => {
       {
         unit: "bag",
         conversionToBase: 1.5,
-        pricePerUnit: 120,
+        pricePerUnit: 60,
       },
     ];
   }
@@ -333,6 +333,7 @@ const CreateOrderModal = ({ open, onClose }) => {
         orderType: isRentalOrder ? "rental" : "sale",
         customerId,
         paidAmount: finalPaidAmount,
+        paymentMode,
         deliveryAddress,
         deliveryCharge: deliveryChargeAmount,
         notes,
@@ -405,8 +406,8 @@ const CreateOrderModal = ({ open, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="max-h-[98vh] w-full max-w-6xl overflow-hidden rounded-3xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+      <div className="modal-panel max-h-[98vh] w-full max-w-6xl overflow-hidden">
+        <div className="flex items-center justify-between border-b px-6 py-4">
           <div>
             <h2 className="text-xl font-bold text-slate-900">
               Create New Order
@@ -419,7 +420,7 @@ const CreateOrderModal = ({ open, onClose }) => {
           <button
             type="button"
             onClick={handleClose}
-            className="rounded-xl bg-slate-100 p-2 text-slate-600 hover:bg-slate-200"
+            className="btn-muted p-2"
           >
             <X size={22} />
           </button>
@@ -432,7 +433,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                 key={step}
                 className={`rounded-xl px-4 py-3 text-center text-sm font-bold ${
                   index === activeStep
-                    ? "bg-blue-600 text-white"
+                    ? "bg-[color:var(--shop-primary)] text-white"
                     : "bg-slate-100 text-slate-500"
                 }`}
               >
@@ -463,7 +464,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                       }}
                       className={`rounded-xl border px-4 py-3 font-bold ${
                         orderType === tab.value
-                          ? "border-blue-600 bg-blue-600 text-white"
+                          ? "border-[color:var(--shop-primary)] bg-[color:var(--shop-primary)] text-white"
                           : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
                       }`}
                     >
@@ -476,7 +477,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search product..."
-                  className="mb-5 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                  className="mb-5 form-control px-4 py-3"
                 />
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -493,7 +494,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                       return (
                         <div
                           key={product._id}
-                          className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                          className="surface-flat p-4"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div>
@@ -530,7 +531,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                                 type="button"
                                 disabled={isOutOfStock}
                                 onClick={() => addProduct(product)}
-                                className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:bg-slate-300"
+                                className="btn-primary text-sm"
                               >
                                 Add
                               </button>
@@ -555,7 +556,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                                       }
                                       className={`rounded-lg px-3 py-2 text-xs font-bold ${
                                         selected.selectedUnit === unitOption.unit
-                                          ? "bg-blue-600 text-white"
+                                          ? "bg-[color:var(--shop-primary)] text-white"
                                           : "bg-slate-100 text-slate-700"
                                       }`}
                                     >
@@ -605,7 +606,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                                         selected.quantity - 1
                                       )
                                     }
-                                    className="rounded-lg bg-slate-100 p-2 text-slate-700"
+                                    className="btn-muted p-2"
                                   >
                                     <Minus size={15} />
                                   </button>
@@ -627,7 +628,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                                         selected.quantity + 1
                                       )
                                     }
-                                    className="rounded-lg bg-slate-100 p-2 text-slate-700"
+                                    className="btn-muted p-2"
                                   >
                                     <Plus size={15} />
                                   </button>
@@ -651,7 +652,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                 </div>
               </section>
 
-              <aside className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+              <aside className="surface-flat sticky top-4 self-start p-5">
                 <h3 className="text-lg font-bold text-slate-900">
                   Selected Items
                 </h3>
@@ -665,7 +666,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                     selectedItems.map((item) => (
                       <div
                         key={item.productId}
-                        className="rounded-xl bg-white p-4 shadow-sm"
+                        className="surface-flat p-4"
                       >
                         <div className="flex justify-between gap-3">
                           <div>
@@ -695,7 +696,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                   )}
                 </div>
 
-                <div className="mt-5 rounded-xl bg-slate-900 p-4 text-white">
+                <div className="mt-5 bill-panel p-4">
                   <div className="flex justify-between">
                     <span>Items Total</span>
                     <span className="font-bold">₹{itemsTotal}</span>
@@ -713,7 +714,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                   onClick={() => setCustomerMode("existing")}
                   className={`rounded-xl border px-4 py-3 font-bold ${
                     customerMode === "existing"
-                      ? "border-blue-600 bg-blue-600 text-white"
+                      ? "border-[color:var(--shop-primary)] bg-[color:var(--shop-primary)] text-white"
                       : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
                   }`}
                 >
@@ -734,7 +735,7 @@ const CreateOrderModal = ({ open, onClose }) => {
               </div>
 
               {customerMode === "existing" ? (
-                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="surface p-6">
                   <label className="mb-2 block text-sm font-semibold text-slate-700">
                     Select Customer
                   </label>
@@ -742,7 +743,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                   <select
                     value={selectedCustomerId}
                     onChange={(e) => setSelectedCustomerId(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                    className="form-control px-4 py-3"
                   >
                     <option value="">Choose customer</option>
                     {customers.map((customer) => (
@@ -753,14 +754,14 @@ const CreateOrderModal = ({ open, onClose }) => {
                   </select>
                 </div>
               ) : (
-                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="surface p-6">
                   <div className="space-y-4">
                     <input
                       name="name"
                       value={newCustomer.name}
                       onChange={handleNewCustomerChange}
                       placeholder="Customer name"
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100"
+                      className="form-control px-4 py-3"
                     />
 
                     <input
@@ -768,7 +769,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                       value={newCustomer.phone}
                       onChange={handleNewCustomerChange}
                       placeholder="Mobile number"
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100"
+                      className="form-control px-4 py-3"
                     />
 
                     <textarea
@@ -777,7 +778,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                       onChange={handleNewCustomerChange}
                       rows="3"
                       placeholder="Customer address"
-                      className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100"
+                      className="form-control resize-none px-4 py-3"
                     />
                   </div>
                 </div>
@@ -800,7 +801,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                         type="date"
                         value={rentalDetails.rentalStartDate}
                         onChange={handleRentalDetailsChange}
-                        className="w-full rounded-xl border border-slate-300 px-4 py-3"
+                        className="form-control px-4 py-3"
                       />
 
                       <input
@@ -808,14 +809,14 @@ const CreateOrderModal = ({ open, onClose }) => {
                         type="date"
                         value={rentalDetails.rentalEndDate}
                         onChange={handleRentalDetailsChange}
-                        className="w-full rounded-xl border border-slate-300 px-4 py-3"
+                        className="form-control px-4 py-3"
                       />
 
                       <select
                         name="rentalPeriodType"
                         value={rentalDetails.rentalPeriodType}
                         onChange={handleRentalDetailsChange}
-                        className="w-full rounded-xl border border-slate-300 px-4 py-3"
+                        className="form-control px-4 py-3"
                       >
                         <option value="day">Day</option>
                         <option value="week">Week</option>
@@ -828,7 +829,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                         value={rentalDetails.rentalPeriodValue}
                         onChange={handleRentalDetailsChange}
                         placeholder="Duration"
-                        className="w-full rounded-xl border border-slate-300 px-4 py-3"
+                        className="form-control px-4 py-3"
                       />
 
                       <input
@@ -837,7 +838,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                         value={rentalDetails.lateChargePerDay}
                         onChange={handleRentalDetailsChange}
                         placeholder="Late charge / day"
-                        className="w-full rounded-xl border border-slate-300 px-4 py-3"
+                        className="form-control px-4 py-3"
                       />
 
                       <input
@@ -845,13 +846,13 @@ const CreateOrderModal = ({ open, onClose }) => {
                         value={securityDeposit}
                         onChange={(e) => setSecurityDeposit(e.target.value)}
                         placeholder="Security deposit"
-                        className="w-full rounded-xl border border-slate-300 px-4 py-3"
+                        className="form-control px-4 py-3"
                       />
                     </div>
                   </div>
                 )}
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                <div className="surface p-5">
                   <h3 className="mb-4 font-bold text-slate-900">
                     Payment Details
                   </h3>
@@ -860,7 +861,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                     <select
                       value={paymentMode}
                       onChange={(e) => setPaymentMode(e.target.value)}
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3"
+                      className="form-control px-4 py-3"
                     >
                       <option value="cash">Cash</option>
                       <option value="upi">UPI</option>
@@ -872,7 +873,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                         setPaymentOption(e.target.value);
                         setPaidAmount("");
                       }}
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3"
+                      className="form-control px-4 py-3"
                     >
                       <option value="full">Full Payment</option>
                       <option value="partial">Partial Payment</option>
@@ -885,7 +886,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                         value={paidAmount}
                         onChange={(e) => setPaidAmount(e.target.value)}
                         placeholder="Paid amount"
-                        className="w-full rounded-xl border border-slate-300 px-4 py-3"
+                        className="form-control px-4 py-3"
                       />
                     )}
 
@@ -894,7 +895,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                       value={deliveryCharge}
                       onChange={(e) => setDeliveryCharge(e.target.value)}
                       placeholder="Delivery charge"
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3"
+                      className="form-control px-4 py-3"
                     />
                   </div>
 
@@ -903,7 +904,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                     onChange={(e) => setDeliveryAddress(e.target.value)}
                     rows="2"
                     placeholder="Delivery address"
-                    className="mt-4 w-full resize-none rounded-xl border border-slate-300 px-4 py-3"
+                    className="mt-4 form-control resize-none px-4 py-3"
                   />
 
                   <textarea
@@ -911,12 +912,12 @@ const CreateOrderModal = ({ open, onClose }) => {
                     onChange={(e) => setNotes(e.target.value)}
                     rows="2"
                     placeholder="Notes"
-                    className="mt-4 w-full resize-none rounded-xl border border-slate-300 px-4 py-3"
+                    className="mt-4 form-control resize-none px-4 py-3"
                   />
                 </div>
               </section>
 
-              <aside className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+              <aside className="surface-flat sticky top-4 self-start p-5">
                 <h3 className="text-lg font-bold text-slate-900">
                   Order Summary
                 </h3>
@@ -940,7 +941,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                   ))}
                 </div>
 
-                <div className="mt-5 rounded-xl bg-slate-900 p-4 text-white">
+                <div className="mt-5 bill-panel p-4">
                   <div className="flex justify-between text-sm">
                     <span>Items Total</span>
                     <span className="font-bold">₹{itemsTotal}</span>
@@ -985,7 +986,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                 setActiveStep(activeStep - 1);
               }
             }}
-            className="rounded-xl bg-slate-100 px-5 py-3 font-semibold text-slate-700 hover:bg-slate-200"
+            className="btn-muted"
           >
             {activeStep === 0 ? "Cancel" : "Back"}
           </button>
@@ -995,7 +996,7 @@ const CreateOrderModal = ({ open, onClose }) => {
               type="button"
               disabled={selectedItems.length === 0}
               onClick={() => setActiveStep(1)}
-              className="rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700 disabled:bg-slate-300"
+              className="btn-primary"
             >
               Next: Customer
             </button>
@@ -1006,7 +1007,7 @@ const CreateOrderModal = ({ open, onClose }) => {
               type="button"
               disabled={!canGoToPayment}
               onClick={() => setActiveStep(2)}
-              className="rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700 disabled:bg-slate-300"
+              className="btn-primary"
             >
               Next: Payment
             </button>
@@ -1017,7 +1018,7 @@ const CreateOrderModal = ({ open, onClose }) => {
               type="button"
               onClick={handleCreateOrder}
               disabled={submitting}
-              className="rounded-xl bg-green-600 px-5 py-3 font-semibold text-white hover:bg-green-700 disabled:bg-slate-300"
+              className="btn-success"
             >
               {submitting ? "Creating..." : "Create Order"}
             </button>

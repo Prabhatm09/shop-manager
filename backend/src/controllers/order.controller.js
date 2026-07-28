@@ -2,6 +2,7 @@ const Order = require("../models/Order");
 const Product = require("../models/Product");
 const Customer = require("../models/Customer");
 const StockMovement = require("../models/StockMovement");
+const Payment = require("../models/Payment");
 
 const getPaymentStatus = (subTotal, paidAmount) => {
   if (paidAmount <= 0) return "unpaid";
@@ -64,6 +65,7 @@ const createOrder = async (req, res) => {
       const product = await Product.findOne({
         _id: item.productId,
         createdBy: req.user._id,
+        isActive: true,
       });
 
       if (!product) {
@@ -77,6 +79,8 @@ const createOrder = async (req, res) => {
         item.pricePerUnit !== undefined
           ? Number(item.pricePerUnit)
           : Number(product.pricePerUnit);
+      const conversionToBase = Number(item.conversionToBase || 1);
+      const selectedUnit = item.selectedUnit || product.unit;
 
       if (!quantity || quantity <= 0) {
         return res.status(400).json({
@@ -90,7 +94,15 @@ const createOrder = async (req, res) => {
         });
       }
 
-      if (quantity > product.currentStock) {
+      if (conversionToBase <= 0) {
+        return res.status(400).json({
+          message: `Invalid unit conversion for ${product.name}`,
+        });
+      }
+
+      const stockDeduct = quantity * conversionToBase;
+
+      if (stockDeduct > product.currentStock) {
         return res.status(400).json({
           message: `${product.name} stock not enough. Available: ${product.currentStock} ${product.unit}`,
         });
@@ -102,17 +114,20 @@ const createOrder = async (req, res) => {
       orderItems.push({
         product: product._id,
         productName: product.name,
-        unit: product.unit,
+        unit: selectedUnit,
+        selectedUnit,
         quantity,
+        conversionToBase,
+        baseQuantity: stockDeduct,
         pricePerUnit,
         total,
       });
 
       stockUpdates.push({
         product,
-        quantity,
+        quantity: stockDeduct,
         previousStock: product.currentStock,
-        newStock: product.currentStock - quantity,
+        newStock: product.currentStock - stockDeduct,
       });
     }
 
@@ -157,6 +172,19 @@ const createOrder = async (req, res) => {
 
       createdBy: req.user._id,
     });
+
+    if (finalPaidAmount > 0) {
+      await Payment.create({
+        order: order._id,
+        customer: customer._id,
+        customerName: customer.name,
+        amount: finalPaidAmount,
+        paymentMode: req.body.paymentMode || "cash",
+        paymentDate: req.body.paymentDate || new Date(),
+        notes: "Initial payment received while creating order",
+        createdBy: req.user._id,
+      });
+    }
 
     for (const update of stockUpdates) {
       update.product.currentStock = update.newStock;
@@ -471,7 +499,8 @@ const markOrderReturned = async (req, res) => {
 
       if (product) {
         const previousStock = product.currentStock;
-        const newStock = previousStock + item.quantity;
+        const restoreQuantity = Number(item.baseQuantity || item.quantity || 0);
+        const newStock = previousStock + restoreQuantity;
 
         product.currentStock = newStock;
         await product.save();
@@ -480,7 +509,7 @@ const markOrderReturned = async (req, res) => {
           product: product._id,
           productName: product.name,
           type: "stock_in",
-          quantity: item.quantity,
+          quantity: restoreQuantity,
           previousStock,
           newStock,
           reason: `Rental item returned by ${order.customerName}`,
@@ -586,6 +615,7 @@ const quickSale = async (req, res) => {
       const product = await Product.findOne({
         _id: item.productId,
         createdBy: req.user._id,
+        isActive: true,
       });
 
       if (!product) {
@@ -651,6 +681,17 @@ const quickSale = async (req, res) => {
       deliveryCharge: 0,
       returnStatus: "not_required",
       notes: `Quick sale payment mode: ${paymentMode}`,
+      createdBy: req.user._id,
+    });
+
+    await Payment.create({
+      order: order._id,
+      customer: customer._id,
+      customerName: customer.name,
+      amount: subTotal,
+      paymentMode,
+      paymentDate: new Date(),
+      notes: "Quick sale payment",
       createdBy: req.user._id,
     });
 

@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, Edit, Plus, Trash2, Eye } from "lucide-react";
+import { Edit, Trash2, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import API from "../api/axios";
 import AppLayout from "../components/AppLayout";
-import CustomerFormModal, {
-  initialCustomerForm,
-} from "../components/CustomerFormModal";
+import CustomerFormModal from "../components/CustomerFormModal";
+import { initialCustomerForm } from "../constants/forms";
 
 const Customers = () => {
   const navigate = useNavigate();
@@ -29,13 +28,6 @@ const [isModalOpen, setIsModalOpen] = useState(false);
   useEffect(() => {
     fetchCustomers();
   }, []);
-
-  const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
-  };
 
 const resetForm = () => {
   setForm(initialCustomerForm);
@@ -108,22 +100,27 @@ const handleEdit = (customer) => {
         resetForm();
         setIsModalOpen(true);
       }}
-      className="w-full rounded-xl bg-green-600 px-5 py-3 font-semibold text-white hover:bg-green-700 md:w-auto"
+      className="btn-success w-full md:w-auto"
     >
       + Add Customer
     </button>
   }
 >
+      {message && (
+        <div className="toast mb-5 px-4 py-3 text-sm font-semibold">
+          {message}
+        </div>
+      )}
       
-     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+     <div className="surface p-6">
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="surface p-6">
           <h2 className="mb-5 text-lg font-bold text-slate-900">
             Customer List
           </h2>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] border-collapse">
+            <table className="shop-table w-full min-w-[760px]">
               <thead>
                 <tr className="border-b bg-slate-50 text-left text-sm text-slate-600">
                   <th className="px-4 py-3">Name</th>
@@ -166,20 +163,20 @@ const handleEdit = (customer) => {
                         <div className="flex justify-end gap-2">
                             <button
                                 onClick={() => navigate(`/customers/${customer._id}`)}
-                                className="rounded-lg bg-blue-50 p-2 text-blue-600 hover:bg-blue-100"
+                                className="btn-muted p-2 text-[color:var(--shop-primary-strong)]"
                                 >
                                 <Eye size={17} />
                             </button>
                           <button
                             onClick={() => handleEdit(customer)}
-                            className="rounded-lg bg-green-50 p-2 text-green-600 hover:bg-green-100"
+                            className="btn-muted p-2 text-green-700"
                           >
                             <Edit size={17} />
                           </button>
 
                           <button
                             onClick={() => handleDelete(customer._id)}
-                            className="rounded-lg bg-red-50 p-2 text-red-600 hover:bg-red-100"
+                            className="btn-muted p-2 text-red-700"
                           >
                             <Trash2 size={17} />
                           </button>

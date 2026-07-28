@@ -44,10 +44,10 @@ const Signup = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 border border-slate-200">
+    <div className="shop-shell min-h-screen flex items-center justify-center px-4">
+      <div className="modal-panel w-full max-w-md p-8">
         <div className="flex justify-center mb-5">
-          <div className="h-16 w-16 rounded-2xl bg-blue-600 flex items-center justify-center text-white">
+          <div className="brand-mark h-16 w-16 rounded-xl flex items-center justify-center text-white">
             <Store size={32} />
           </div>
         </div>
@@ -76,7 +76,7 @@ const Signup = () => {
               value={form.name}
               onChange={handleChange}
               placeholder="Enter your name"
-              className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-600"
+              className="form-control mt-2 px-4 py-3"
             />
           </div>
 
@@ -90,7 +90,7 @@ const Signup = () => {
               onChange={handleChange}
               type="email"
               placeholder="Enter your email"
-              className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-600"
+              className="form-control mt-2 px-4 py-3"
             />
           </div>
 
@@ -106,7 +106,7 @@ const Signup = () => {
                 onChange={handleChange}
                 type={showPassword ? "text" : "password"}
                 placeholder="Create password"
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 pr-12 outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-600"
+                className="form-control px-4 py-3 pr-12"
               />
 
               <button
@@ -121,7 +121,7 @@ const Signup = () => {
 
           <button
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold disabled:opacity-70"
+            className="btn-primary w-full py-3"
           >
             {loading ? "Creating account..." : "Sign Up"}
           </button>
@@ -129,7 +129,7 @@ const Signup = () => {
 
         <p className="text-center text-sm text-slate-500 mt-6">
           Already have an account?{" "}
-          <Link to="/signin" className="text-blue-600 font-semibold">
+          <Link to="/signin" className="text-[color:var(--shop-primary)] font-semibold">
             Sign In
           </Link>
         </p>

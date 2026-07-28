@@ -35,61 +35,23 @@ const orderItemSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
-    orderType: {
-  type: String,
-  enum: ["sale", "rental"],
-  default: "sale",
-},
+    selectedUnit: {
+      type: String,
+      default: "",
+      trim: true,
+    },
 
-rentalStartDate: {
-  type: Date,
-  default: null,
-},
+    conversionToBase: {
+      type: Number,
+      default: 1,
+      min: 0,
+    },
 
-rentalEndDate: {
-  type: Date,
-  default: null,
-},
-
-rentalPeriodType: {
-  type: String,
-  enum: ["day", "week", "month"],
-  default: "day",
-},
-
-rentalPeriodValue: {
-  type: Number,
-  default: 0,
-},
-
-deliveryCharge: {
-  type: Number,
-  default: 0,
-  min: 0,
-},
-
-returnStatus: {
-  type: String,
-  enum: ["not_required", "pending", "returned", "late"],
-  default: "not_required",
-},
-
-returnedDate: {
-  type: Date,
-  default: null,
-},
-
-lateChargePerDay: {
-  type: Number,
-  default: 0,
-  min: 0,
-},
-
-lateCharge: {
-  type: Number,
-  default: 0,
-  min: 0,
-},
+    baseQuantity: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
 
   },
   { _id: false }
@@ -147,6 +109,13 @@ const orderSchema = new mongoose.Schema(
       enum: ["unpaid", "partial", "paid"],
       default: "unpaid",
     },
+
+    orderType: {
+      type: String,
+      enum: ["sale", "rental"],
+      default: "sale",
+    },
+
     orderStatus: {
         type: String,
         enum: ["pending", "confirmed", "dispatched", "delivered", "cancelled"],
@@ -162,6 +131,57 @@ const orderSchema = new mongoose.Schema(
       type: String,
       default: "",
       trim: true,
+    },
+
+    deliveryCharge: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    rentalStartDate: {
+      type: Date,
+      default: null,
+    },
+
+    rentalEndDate: {
+      type: Date,
+      default: null,
+    },
+
+    rentalPeriodType: {
+      type: String,
+      enum: ["day", "week", "month"],
+      default: "day",
+    },
+
+    rentalPeriodValue: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    returnStatus: {
+      type: String,
+      enum: ["not_required", "pending", "returned", "late"],
+      default: "not_required",
+    },
+
+    returnedDate: {
+      type: Date,
+      default: null,
+    },
+
+    lateChargePerDay: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    lateCharge: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
 
     returnDate: {
