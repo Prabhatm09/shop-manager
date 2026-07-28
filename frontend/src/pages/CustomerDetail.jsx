@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import API from "../api/axios";
 import AppLayout from "../components/AppLayout";
+import LoadingState from "../components/LoadingState";
 
 const CustomerDetail = () => {
   const { id } = useParams();
@@ -19,6 +20,7 @@ const CustomerDetail = () => {
   const [orders, setOrders] = useState([]);
   const [payments, setPayments] = useState([]);
   const [message, setMessage] = useState("");
+  const [dataLoading, setDataLoading] = useState(true);
   const [collectOpen, setCollectOpen] = useState(false);
   const [collectForm, setCollectForm] = useState({
     amount: "",
@@ -30,6 +32,7 @@ const CustomerDetail = () => {
 
   const fetchCustomerDetail = useCallback(async () => {
     try {
+      setDataLoading(true);
       const res = await API.get(`/customers/${id}`);
 
       setCustomer(res.data.customer);
@@ -40,6 +43,8 @@ const CustomerDetail = () => {
       setMessage(
         error.response?.data?.message || "Failed to load customer detail"
       );
+    } finally {
+      setDataLoading(false);
     }
   }, [id]);
 
@@ -80,11 +85,24 @@ const CustomerDetail = () => {
   e.preventDefault();
 
   try {
+    const amount = Number(collectForm.amount);
+    const totalDue = Number(stats.totalDue || 0);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setMessage("Payment amount must be greater than 0");
+      return;
+    }
+
+    if (amount > totalDue) {
+      setMessage("Payment cannot be greater than total due");
+      return;
+    }
+
     setCollectLoading(true);
     setMessage("");
 
     await API.post(`/payments/customer/${id}/collect`, {
-      amount: Number(collectForm.amount),
+      amount,
       paymentMode: collectForm.paymentMode,
       paymentDate: collectForm.paymentDate || new Date(),
       notes: collectForm.notes,
@@ -125,7 +143,9 @@ const CustomerDetail = () => {
         </div>
       )}
 
-      {customer && (
+      {dataLoading ? (
+        <LoadingState label="Loading customer ledger..." />
+      ) : customer && (
         <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex-1">
@@ -348,7 +368,7 @@ const CustomerDetail = () => {
                     </div>
                     )}
 
-                  <div className="mt-4 grid grid-cols-3 gap-3 rounded-xl bg-slate-50 p-3 text-sm">
+                  <div className="mt-4 grid grid-cols-1 gap-3 rounded-xl sm:grid-cols-3 bg-slate-50 p-3 text-sm">
                     <div>
                       <p className="text-slate-500">Paid</p>
                       <p className="font-bold text-green-700">
@@ -421,9 +441,9 @@ const CustomerDetail = () => {
         </section>
       </div>
       {collectOpen && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-    <div className="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl">
-      <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+  <div className="mobile-sheet fixed inset-0 z-50 flex bg-black/50 sm:px-4">
+    <div className="modal-panel w-full max-w-xl overflow-hidden">
+      <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-6">
         <div>
           <h2 className="text-xl font-bold text-slate-900">
             Collect Payment
@@ -459,6 +479,8 @@ const CustomerDetail = () => {
             </label>
             <input
               type="number"
+              min="1"
+              step="0.01"
               value={collectForm.amount}
               onChange={(e) =>
                 setCollectForm({
@@ -539,7 +561,7 @@ const CustomerDetail = () => {
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+        <div className="thumb-footer flex flex-col-reverse gap-3 border-t border-slate-200 px-4 py-4 sm:flex-row sm:justify-end sm:px-6">
           <button
             type="button"
             onClick={() => setCollectOpen(false)}
@@ -552,6 +574,7 @@ const CustomerDetail = () => {
             disabled={
               collectLoading ||
               !collectForm.amount ||
+              !Number.isFinite(Number(collectForm.amount)) ||
               Number(collectForm.amount) <= 0 ||
               Number(collectForm.amount) > Number(stats.totalDue)
             }

@@ -74,7 +74,7 @@ const getCustomerById = async (req, res) => {
       customer: customer._id,
       createdBy: req.user._id,
     })
-      .populate("order", "_id subTotal dueAmount paymentStatus")
+      .populate("order", "_id billNumber createdAt subTotal dueAmount paymentStatus")
       .sort({ paymentDate: -1 });
 
      let runningBalance =

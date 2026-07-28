@@ -25,9 +25,9 @@ const CustomerFormModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+    <div className="mobile-sheet fixed inset-0 z-50 flex bg-black/50 sm:px-4">
       <div className="modal-panel max-h-[92vh] w-full max-w-2xl overflow-hidden">
-        <div className="flex items-center justify-between border-b px-6 py-4">
+        <div className="flex items-center justify-between border-b px-4 py-4 sm:px-6">
           <div>
             <h2 className="text-xl font-bold text-slate-900">
               {editingId ? "Edit Customer" : "Add Customer"}
@@ -46,7 +46,7 @@ const CustomerFormModal = ({
         </div>
 
         <form onSubmit={onSubmit}>
-          <div className="max-h-[65vh] overflow-y-auto p-6">
+          <div className="max-h-[68vh] overflow-y-auto p-4 sm:p-6">
             <div className="space-y-4">
               <div>
                 <label className="field-label">
@@ -118,7 +118,7 @@ const CustomerFormModal = ({
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 border-t px-6 py-4">
+          <div className="thumb-footer flex flex-col-reverse gap-3 border-t px-4 py-4 sm:flex-row sm:justify-end sm:px-6">
             <button
               type="button"
               onClick={handleClose}

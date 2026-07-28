@@ -1,6 +1,27 @@
 const Product = require("../models/Product");
 const StockMovement = require("../models/StockMovement");
 
+const isFiniteNumber = (value) => Number.isFinite(Number(value));
+
+const normalizeSaleUnits = (saleUnits = []) => {
+  if (!Array.isArray(saleUnits)) return [];
+
+  return saleUnits
+    .map((unit) => ({
+      unit: String(unit.unit || "").trim(),
+      conversionToBase: Number(unit.conversionToBase || 1),
+      pricePerUnit: Number(unit.pricePerUnit || 0),
+    }))
+    .filter(
+      (unit) =>
+        unit.unit &&
+        isFiniteNumber(unit.conversionToBase) &&
+        unit.conversionToBase > 0 &&
+        isFiniteNumber(unit.pricePerUnit) &&
+        unit.pricePerUnit > 0
+    );
+};
+
 const createProduct = async (req, res) => {
   try {
     const {
@@ -23,17 +44,37 @@ const createProduct = async (req, res) => {
      }
 
     const openingStock = Number(currentStock || 0);
+    const finalPrice = Number(pricePerUnit);
+    const finalLowStockAlert = Number(lowStockAlert || 10);
+
+    if (!isFiniteNumber(finalPrice) || finalPrice < 0) {
+      return res.status(400).json({
+        message: "Product price is not valid",
+      });
+    }
+
+    if (!isFiniteNumber(openingStock) || openingStock < 0) {
+      return res.status(400).json({
+        message: "Opening stock cannot be negative",
+      });
+    }
+
+    if (!isFiniteNumber(finalLowStockAlert) || finalLowStockAlert < 0) {
+      return res.status(400).json({
+        message: "Low stock alert cannot be negative",
+      });
+    }
 
     const product = await Product.create({
         name,
         category,
-        subCategory, // ✅ this was missing
+        subCategory,
         unit,
-        pricePerUnit: Number(pricePerUnit),
-        currentStock: Number(currentStock || 0),
-        lowStockAlert: Number(lowStockAlert || 10),
+        pricePerUnit: finalPrice,
+        currentStock: openingStock,
+        lowStockAlert: finalLowStockAlert,
         description: description || "",
-        saleUnits: saleUnits || [],
+        saleUnits: normalizeSaleUnits(saleUnits),
         quickQuantities: quickQuantities || [],
         createdBy: req.user._id,
     });
@@ -131,6 +172,25 @@ const getProductById = async (req, res) => {
 
 const updateProduct = async (req, res) => {
   try {
+    if (
+      req.body.pricePerUnit !== undefined &&
+      (!isFiniteNumber(req.body.pricePerUnit) || Number(req.body.pricePerUnit) < 0)
+    ) {
+      return res.status(400).json({
+        message: "Product price is not valid",
+      });
+    }
+
+    if (
+      req.body.lowStockAlert !== undefined &&
+      (!isFiniteNumber(req.body.lowStockAlert) ||
+        Number(req.body.lowStockAlert) < 0)
+    ) {
+      return res.status(400).json({
+        message: "Low stock alert cannot be negative",
+      });
+    }
+
     const allowedFields = {
       name: req.body.name,
       category: req.body.category,
@@ -145,7 +205,10 @@ const updateProduct = async (req, res) => {
           ? Number(req.body.lowStockAlert)
           : undefined,
       description: req.body.description,
-      saleUnits: req.body.saleUnits,
+      saleUnits:
+        req.body.saleUnits !== undefined
+          ? normalizeSaleUnits(req.body.saleUnits)
+          : undefined,
       quickQuantities: req.body.quickQuantities,
       isActive: req.body.isActive,
     };

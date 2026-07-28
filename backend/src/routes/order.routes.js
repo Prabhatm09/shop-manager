@@ -9,6 +9,7 @@ const {
   getReturnReminders,
   markOrderReturned,
   updateOrderStatus,
+  createOrderAdjustment,
   updateOrder,
   deleteOrder,
 } = require("../controllers/order.controller");
@@ -25,6 +26,7 @@ router.get("/returns/reminders", getReturnReminders);
 
 router.patch("/:id/mark-returned", markOrderReturned);
 router.patch("/:id/status", updateOrderStatus);
+router.post("/:id/adjustments", createOrderAdjustment);
 router.post("/quick-sale", quickSale);
 
 router

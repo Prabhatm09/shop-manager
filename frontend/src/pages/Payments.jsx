@@ -2,20 +2,24 @@ import { useEffect, useMemo, useState } from "react";
 import { IndianRupee, Search, Wallet } from "lucide-react";
 import API from "../api/axios";
 import AppLayout from "../components/AppLayout";
+import LoadingState from "../components/LoadingState";
 import PaymentFormModal from "../components/PaymentFormModal";
 import { initialPaymentForm } from "../constants/forms";
+import getBillNumber from "../utils/billNumber";
 
 const Payments = () => {
   const [orders, setOrders] = useState([]);
   const [payments, setPayments] = useState([]);
   const [form, setForm] = useState(initialPaymentForm);
   const [message, setMessage] = useState("");
+  const [dataLoading, setDataLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [search, setSearch] = useState("");
 
   const fetchData = async () => {
     try {
+      setDataLoading(true);
       const [orderRes, paymentRes] = await Promise.all([
         API.get("/orders"),
         API.get("/payments"),
@@ -29,6 +33,8 @@ const Payments = () => {
       setPayments(paymentRes.data.payments || []);
     } catch (error) {
       setMessage(error.response?.data?.message || "Failed to load payments");
+    } finally {
+      setDataLoading(false);
     }
   };
 
@@ -115,11 +121,29 @@ const Payments = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage("");
+
+    const amount = Number(form.amount);
+
+    if (!form.orderId) {
+      setMessage("Please choose a due order");
+      return;
+    }
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setMessage("Payment amount must be greater than 0");
+      return;
+    }
+
+    if (selectedOrder && amount > Number(selectedOrder.dueAmount || 0)) {
+      setMessage("Payment cannot be greater than due amount");
+      return;
+    }
+
     setLoading(true);
 
     const payload = {
       orderId: form.orderId,
-      amount: Number(form.amount),
+      amount,
       paymentMode: form.paymentMode,
       paymentDate: form.paymentDate || new Date(),
       notes: form.notes,
@@ -189,6 +213,10 @@ const Payments = () => {
         </div>
       )}
 
+      {dataLoading ? (
+        <LoadingState label="Loading shop payments..." />
+      ) : (
+        <>
       <div className="mb-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-5">
         {cards.map((card) => {
           const Icon = card.icon;
@@ -228,12 +256,69 @@ const Payments = () => {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search due orders..."
-              className="w-full rounded-xl border border-slate-300 py-3 pl-11 pr-4 outline-none focus:border-green-600 focus:ring-4 focus:ring-green-100"
+              className="form-control py-3 pl-11 pr-4"
             />
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="space-y-3 md:hidden">
+          {filteredDueOrders.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+              No due orders found.
+            </div>
+          ) : (
+            filteredDueOrders.map((order) => (
+              <article key={order._id} className="surface-flat p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black uppercase text-slate-500">
+                      {getBillNumber(order)}
+                    </p>
+                    <h3 className="mt-1 text-base font-black text-slate-900">
+                      {order.customerName}
+                    </h3>
+                    <p className="text-sm font-semibold text-slate-500">
+                      {order.customerPhone}
+                    </p>
+                  </div>
+                  <span
+                    className={`status-pill capitalize ${
+                      order.paymentStatus === "partial"
+                        ? "bg-yellow-100 text-yellow-700"
+                        : "bg-red-100 text-red-700"
+                    }`}
+                  >
+                    {order.paymentStatus}
+                  </span>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <div className="rounded-xl bg-[color:var(--shop-panel-2)] p-3">
+                    <p className="text-xs font-bold text-slate-500">Total</p>
+                    <p className="font-black text-slate-900">₹{order.subTotal}</p>
+                  </div>
+                  <div className="rounded-xl bg-[color:var(--shop-primary-soft)] p-3">
+                    <p className="text-xs font-bold text-green-700">Paid</p>
+                    <p className="font-black text-green-800">₹{order.paidAmount}</p>
+                  </div>
+                  <div className="rounded-xl bg-[color:var(--shop-brick-soft)] p-3">
+                    <p className="text-xs font-bold text-red-700">Due</p>
+                    <p className="font-black text-red-800">₹{order.dueAmount}</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => openPaymentModal(order)}
+                  className="btn-success mt-4 w-full text-sm"
+                >
+                  Receive Payment
+                </button>
+              </article>
+            ))
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="shop-table w-full min-w-[950px]">
             <thead>
               <tr className="border-b bg-slate-50 text-left text-sm text-slate-600">
@@ -265,7 +350,7 @@ const Payments = () => {
                   >
                     <td className="px-4 py-4">
                       <p className="font-bold text-slate-900">
-                        #{order._id.slice(-6).toUpperCase()}
+                        {getBillNumber(order)}
                       </p>
                       <p className="mt-1 text-xs text-slate-400">
                         {new Date(order.createdAt).toLocaleDateString()}
@@ -326,7 +411,50 @@ const Payments = () => {
           Payment History
         </h2>
 
-        <div className="overflow-x-auto">
+        <div className="space-y-3 md:hidden">
+          {filteredPayments.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+              No payments found.
+            </div>
+          ) : (
+            filteredPayments.map((payment) => (
+              <article key={payment._id} className="surface-flat p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-black text-slate-900">
+                      {payment.customerName}
+                    </h3>
+                    <p className="mt-1 text-xs font-bold uppercase text-slate-500">
+                      {payment.order?._id
+                        ? getBillNumber(payment.order)
+                        : "Opening due"}
+                    </p>
+                  </div>
+                  <p className="text-xl font-black text-green-700">
+                    ₹{payment.amount}
+                  </p>
+                </div>
+
+                <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-[color:var(--shop-panel-2)] p-3 text-sm">
+                  <span className="font-bold capitalize text-slate-700">
+                    {payment.paymentMode}
+                  </span>
+                  <span className="font-semibold text-slate-500">
+                    {new Date(payment.paymentDate).toLocaleDateString()}
+                  </span>
+                </div>
+
+                {payment.notes && (
+                  <p className="mt-3 text-sm font-medium text-slate-600">
+                    {payment.notes}
+                  </p>
+                )}
+              </article>
+            ))
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="shop-table w-full min-w-[850px]">
             <thead>
               <tr className="border-b bg-slate-50 text-left text-sm text-slate-600">
@@ -367,7 +495,7 @@ const Payments = () => {
 
                     <td className="px-4 py-4 font-semibold text-slate-700">
                       {payment.order?._id
-                        ? `#${payment.order._id.slice(-6).toUpperCase()}`
+                        ? getBillNumber(payment.order)
                         : "-"}
                     </td>
 
@@ -402,6 +530,8 @@ const Payments = () => {
         onSubmit={handleSubmit}
         selectedOrder={selectedOrder}
       />
+        </>
+      )}
     </AppLayout>
   );
 };

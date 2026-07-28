@@ -16,6 +16,9 @@
   --shop-brick-soft: oklch(0.94 0.04 35);
   --shop-sand: oklch(0.77 0.115 82);
   --shop-sand-soft: oklch(0.94 0.05 82);
+  --shop-cement: oklch(0.79 0.018 84);
+  --shop-cement-soft: oklch(0.955 0.01 84);
+  --shop-steel: oklch(0.43 0.02 245);
   --shop-info: oklch(0.48 0.095 230);
   --shop-info-soft: oklch(0.93 0.035 230);
   --shop-shadow: 0 18px 45px oklch(0.28 0.03 70 / 0.09);
@@ -32,8 +35,11 @@ body {
     "Segoe UI", sans-serif;
   color: var(--shop-text);
   background:
+    linear-gradient(90deg, oklch(0.82 0.012 83 / 0.16) 1px, transparent 1px),
+    linear-gradient(180deg, oklch(0.82 0.012 83 / 0.12) 1px, transparent 1px),
     linear-gradient(180deg, oklch(0.985 0.01 83), var(--shop-bg) 360px),
     var(--shop-bg);
+  background-size: 44px 44px, 44px 44px, auto, auto;
 }
 
 button,
@@ -46,7 +52,8 @@ textarea {
 @layer components {
   .shop-shell {
     background:
-      radial-gradient(circle at top left, oklch(0.92 0.04 82 / 0.8), transparent 340px),
+      linear-gradient(135deg, oklch(0.55 0.06 72 / 0.045) 25%, transparent 25%) 0 0 / 18px 18px,
+      linear-gradient(315deg, oklch(0.55 0.06 72 / 0.035) 25%, transparent 25%) 0 0 / 18px 18px,
       linear-gradient(180deg, oklch(0.985 0.01 83), var(--shop-bg) 420px);
   }
 
@@ -58,14 +65,17 @@ textarea {
 
   .shop-header {
     border-color: var(--shop-border);
-    background: oklch(0.992 0.006 83 / 0.88);
+    background:
+      linear-gradient(90deg, oklch(0.58 0.09 154 / 0.08), transparent 44%),
+      oklch(0.992 0.006 83 / 0.92);
     backdrop-filter: blur(14px);
   }
 
   .brand-mark {
     border: 1px solid oklch(0.58 0.08 154);
     background:
-      linear-gradient(135deg, var(--shop-primary), var(--shop-primary-strong));
+      linear-gradient(135deg, var(--shop-primary), var(--shop-primary-strong)),
+      repeating-linear-gradient(0deg, transparent 0 12px, oklch(0.985 0.006 83 / 0.16) 12px 13px);
     box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.22), 0 10px 22px oklch(0.4 0.09 154 / 0.22);
   }
 
@@ -95,7 +105,9 @@ textarea {
   .surface {
     border: 1px solid var(--shop-border);
     border-radius: 14px;
-    background: var(--shop-panel);
+    background:
+      linear-gradient(180deg, oklch(0.998 0.004 83), var(--shop-panel)),
+      var(--shop-panel);
     box-shadow: var(--shop-shadow-sm);
   }
 
@@ -110,7 +122,9 @@ textarea {
     overflow: hidden;
     border: 1px solid var(--shop-border);
     border-radius: 14px;
-    background: linear-gradient(180deg, var(--shop-panel), oklch(0.975 0.01 83));
+    background:
+      linear-gradient(180deg, var(--shop-panel), oklch(0.975 0.01 83)),
+      repeating-linear-gradient(90deg, transparent 0 28px, oklch(0.82 0.012 83 / 0.16) 28px 29px);
     box-shadow: var(--shop-shadow-sm);
   }
 
@@ -135,6 +149,7 @@ textarea {
     border: 1px solid transparent;
     padding: 0.7rem 1rem;
     font-weight: 750;
+    min-height: 44px;
     line-height: 1;
     transition: background-color 180ms ease-out, border-color 180ms ease-out,
       color 180ms ease-out, transform 180ms ease-out, box-shadow 180ms ease-out;
@@ -180,6 +195,7 @@ textarea {
 
   .form-control {
     width: 100%;
+    min-height: 44px;
     border: 1px solid var(--shop-border);
     border-radius: 10px;
     background: oklch(0.995 0.004 83);
@@ -217,7 +233,8 @@ textarea {
   }
 
   .shop-table thead tr {
-    background: oklch(0.94 0.012 83);
+    background:
+      linear-gradient(180deg, var(--shop-cement-soft), oklch(0.925 0.012 83));
   }
 
   .shop-table th {
@@ -269,8 +286,172 @@ textarea {
   .modal-panel {
     border: 1px solid var(--shop-border);
     border-radius: 16px;
-    background: var(--shop-panel);
+    background:
+      linear-gradient(180deg, oklch(0.998 0.004 83), var(--shop-panel) 180px),
+      var(--shop-panel);
     box-shadow: var(--shop-shadow);
+  }
+
+  .mobile-sheet {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .mobile-sheet .modal-panel {
+    width: 100%;
+    max-height: 94vh;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .thumb-footer {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .mobile-bottom-nav {
+    border-color: var(--shop-border);
+    background:
+      linear-gradient(180deg, oklch(0.998 0.004 83 / 0.96), var(--shop-panel)),
+      var(--shop-panel);
+    box-shadow: 0 -14px 34px oklch(0.28 0.03 70 / 0.12);
+    backdrop-filter: blur(14px);
+  }
+
+  .mobile-bottom-link {
+    position: relative;
+    min-height: 58px;
+    border: 1px solid transparent;
+    transition: background-color 180ms ease-out, color 180ms ease-out,
+      border-color 180ms ease-out, transform 180ms ease-out;
+  }
+
+  .mobile-bottom-link-active {
+    border-color: oklch(0.74 0.08 154);
+    background: var(--shop-primary-soft);
+    color: var(--shop-primary-strong);
+  }
+
+  .mobile-bottom-link-active::before {
+    content: "";
+    position: absolute;
+    top: 5px;
+    width: 22px;
+    height: 3px;
+    border-radius: 999px;
+    background: var(--shop-primary);
+  }
+
+  .construction-loader {
+    border-color: var(--shop-border);
+    background:
+      linear-gradient(90deg, oklch(0.78 0.016 84 / 0.2) 1px, transparent 1px),
+      linear-gradient(180deg, oklch(0.78 0.016 84 / 0.14) 1px, transparent 1px),
+      linear-gradient(180deg, oklch(0.995 0.004 83), var(--shop-cement-soft));
+    background-size: 22px 22px, 22px 22px, auto;
+  }
+
+  .loader-house {
+    position: relative;
+    width: 76px;
+    height: 66px;
+    animation: loader-lift 1400ms cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  }
+
+  .loader-roof {
+    position: absolute;
+    left: 16px;
+    top: 4px;
+    width: 44px;
+    height: 44px;
+    border-radius: 7px 7px 4px 7px;
+    background: var(--shop-brick);
+    transform: rotate(45deg);
+    box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.24);
+  }
+
+  .loader-body {
+    position: absolute;
+    bottom: 0;
+    left: 12px;
+    width: 52px;
+    height: 42px;
+    border: 2px solid oklch(0.55 0.045 72);
+    border-radius: 8px 8px 5px 5px;
+    background:
+      repeating-linear-gradient(0deg, transparent 0 13px, oklch(0.64 0.025 72 / 0.38) 13px 14px),
+      repeating-linear-gradient(90deg, var(--shop-sand-soft) 0 16px, oklch(0.91 0.036 82) 16px 17px);
+    box-shadow: 0 10px 22px oklch(0.28 0.03 70 / 0.12);
+  }
+
+  .loader-door {
+    position: absolute;
+    bottom: 0;
+    left: 8px;
+    width: 14px;
+    height: 23px;
+    border-radius: 5px 5px 0 0;
+    background: var(--shop-primary-strong);
+  }
+
+  .loader-window {
+    position: absolute;
+    right: 9px;
+    top: 10px;
+    width: 15px;
+    height: 13px;
+    border: 2px solid var(--shop-steel);
+    border-radius: 3px;
+    background: oklch(0.97 0.018 230);
+  }
+
+  .loader-hammer {
+    animation: loader-hammer 900ms cubic-bezier(0.22, 1, 0.36, 1) infinite;
+    transform-origin: 70% 80%;
+  }
+
+  .loader-progress {
+    width: 42%;
+    animation: loader-progress 1400ms cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  }
+
+  @keyframes loader-lift {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-4px);
+    }
+  }
+
+  @keyframes loader-hammer {
+    0%,
+    100% {
+      transform: rotate(-18deg);
+    }
+    45% {
+      transform: rotate(18deg);
+    }
+  }
+
+  @keyframes loader-progress {
+    0% {
+      transform: translateX(-115%);
+    }
+    55%,
+    100% {
+      transform: translateX(250%);
+    }
+  }
+
+  @media (min-width: 640px) {
+    .mobile-sheet {
+      align-items: center;
+      padding: 1rem;
+    }
+
+    .mobile-sheet .modal-panel {
+      border-radius: 16px;
+    }
   }
 
   .bill-panel {
@@ -280,6 +461,49 @@ textarea {
       linear-gradient(180deg, oklch(0.25 0.025 72), oklch(0.2 0.02 72));
     color: oklch(0.965 0.01 83);
     box-shadow: var(--shop-shadow-sm);
+  }
+
+  @media (max-width: 640px) {
+    .shop-header {
+      padding: 1rem;
+    }
+
+    .surface,
+    .surface-flat,
+    .metric-card {
+      border-radius: 12px;
+    }
+
+    .btn-primary,
+    .btn-success,
+    .btn-danger,
+    .btn-muted {
+      min-height: 48px;
+      border-radius: 12px;
+      padding: 0.78rem 0.95rem;
+    }
+
+    .form-control {
+      min-height: 48px;
+      border-radius: 12px;
+      font-size: 16px;
+    }
+
+    .mobile-sheet .modal-panel {
+      max-height: 96vh;
+      border-radius: 18px 18px 0 0;
+    }
+
+    .thumb-footer {
+      position: sticky;
+      bottom: 0;
+      z-index: 5;
+      margin-inline: -1rem;
+      border-top: 1px solid var(--shop-border);
+      background: var(--shop-panel);
+      padding-inline: 1rem;
+      padding-top: 0.75rem;
+    }
   }
 }
 

@@ -2,27 +2,66 @@ import { useEffect, useState } from "react";
 import { Edit, Trash2 } from "lucide-react";
 import API from "../api/axios";
 import AppLayout from "../components/AppLayout";
+import LoadingState from "../components/LoadingState";
 import ProductFormModal from "../components/ProductFormModal";
 import {
   CATEGORY_OPTIONS,
   initialProductForm,
 } from "../constants/forms";
 
+const normalizeSaleUnits = (form) => {
+  const saleUnits = (form.saleUnits || [])
+    .map((unit) => ({
+      unit: unit.unit?.trim(),
+      conversionToBase: Number(unit.conversionToBase || 1),
+      pricePerUnit: Number(unit.pricePerUnit || 0),
+    }))
+    .filter(
+      (unit) =>
+        unit.unit &&
+        Number.isFinite(unit.conversionToBase) &&
+        unit.conversionToBase > 0 &&
+        Number.isFinite(unit.pricePerUnit) &&
+        unit.pricePerUnit > 0
+    );
+
+  if (saleUnits.length > 0) return saleUnits;
+
+  return [
+    {
+      unit: form.unit,
+      conversionToBase: 1,
+      pricePerUnit: Number(form.pricePerUnit || 0),
+    },
+  ];
+};
 
 const Products = () => {
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState(initialProductForm);
   const [editingId, setEditingId] = useState(null);
+  const [dataLoading, setDataLoading] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [stockLoading, setStockLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [stockModal, setStockModal] = useState({
+    open: false,
+    mode: "add",
+    product: null,
+    quantity: "",
+    reason: "",
+  });
 
   const fetchProducts = async () => {
     try {
+      setDataLoading(true);
       const res = await API.get("/products");
       setProducts(res.data.products || []);
     } catch (error) {
       setMessage(error.response?.data?.message || "Failed to load products");
+    } finally {
+      setDataLoading(false);
     }
   };
 
@@ -45,11 +84,7 @@ const resetForm = () => {
   pricePerUnit: Number(form.pricePerUnit),
   currentStock: Number(form.currentStock || 0),
   lowStockAlert: Number(form.lowStockAlert || 10),
-  saleUnits: (form.saleUnits || []).map((unit) => ({
-    unit: unit.unit,
-    conversionToBase: Number(unit.conversionToBase || 1),
-    pricePerUnit: Number(unit.pricePerUnit || 0),
-  })),
+  saleUnits: normalizeSaleUnits(form),
   quickQuantities:
     typeof form.quickQuantities === "string"
       ? form.quickQuantities
@@ -92,7 +127,20 @@ const resetForm = () => {
     currentStock: product.currentStock || "",
     lowStockAlert: product.lowStockAlert || 10,
     description: product.description || "",
-    
+    saleUnits: product.saleUnits?.length
+      ? product.saleUnits.map((unit) => ({
+          unit: unit.unit || "",
+          conversionToBase: unit.conversionToBase || 1,
+          pricePerUnit: unit.pricePerUnit || "",
+        }))
+      : [
+          {
+            unit: product.unit || "bag",
+            conversionToBase: 1,
+            pricePerUnit: product.pricePerUnit || "",
+          },
+        ],
+    quickQuantities: product.quickQuantities?.join(", ") || "",
   });
 
   setIsModalOpen(true);
@@ -111,50 +159,76 @@ const resetForm = () => {
     }
   };
 
-  const handleAddStock = async (product) => {
-  const quantity = window.prompt(`Add stock for ${product.name}`);
-
-  if (!quantity || Number(quantity) <= 0) return;
-
-  const reason = window.prompt("Reason", "New stock added") || "New stock added";
-
-  try {
-    await API.patch(`/products/${product._id}/add-stock`, {
-      quantity: Number(quantity),
-      reason,
+  const openStockModal = (mode, product) => {
+    setMessage("");
+    setStockModal({
+      open: true,
+      mode,
+      product,
+      quantity: mode === "adjust" ? String(product.currentStock || 0) : "",
+      reason: mode === "adjust" ? "Manual stock correction" : "New stock added",
     });
+  };
 
-    setMessage("Stock added successfully");
-    fetchProducts();
-  } catch (error) {
-    setMessage(error.response?.data?.message || "Failed to add stock");
-  }
-};
-
-const handleAdjustStock = async (product) => {
-  const newStock = window.prompt(
-    `Set current stock for ${product.name}`,
-    product.currentStock
-  );
-
-  if (newStock === null || Number(newStock) < 0) return;
-
-  const reason =
-    window.prompt("Reason", "Manual stock correction") ||
-    "Manual stock correction";
-
-  try {
-    await API.patch(`/products/${product._id}/adjust-stock`, {
-      newStock: Number(newStock),
-      reason,
+  const closeStockModal = () => {
+    setStockModal({
+      open: false,
+      mode: "add",
+      product: null,
+      quantity: "",
+      reason: "",
     });
+  };
 
-    setMessage("Stock adjusted successfully");
-    fetchProducts();
-  } catch (error) {
-    setMessage(error.response?.data?.message || "Failed to adjust stock");
-  }
-};
+  const handleStockSubmit = async (e) => {
+    e.preventDefault();
+
+    const value = Number(stockModal.quantity);
+
+    if (!stockModal.product) return;
+
+    if (stockModal.mode === "add" && (!value || value <= 0)) {
+      setMessage("Stock quantity must be greater than 0");
+      return;
+    }
+
+    if (stockModal.mode === "adjust" && value < 0) {
+      setMessage("Stock cannot be negative");
+      return;
+    }
+
+    try {
+      setStockLoading(true);
+      setMessage("");
+
+      if (stockModal.mode === "add") {
+        await API.patch(`/products/${stockModal.product._id}/add-stock`, {
+          quantity: value,
+          reason: stockModal.reason || "New stock added",
+        });
+        setMessage("Stock added successfully");
+      } else {
+        await API.patch(`/products/${stockModal.product._id}/adjust-stock`, {
+          newStock: value,
+          reason: stockModal.reason || "Manual stock correction",
+        });
+        setMessage("Stock adjusted successfully");
+      }
+
+      setStockModal({
+        open: false,
+        mode: "add",
+        product: null,
+        quantity: "",
+        reason: "",
+      });
+      fetchProducts();
+    } catch (error) {
+      setMessage(error.response?.data?.message || "Stock update failed");
+    } finally {
+      setStockLoading(false);
+    }
+  };
 
   return (
    <AppLayout
@@ -177,13 +251,96 @@ const handleAdjustStock = async (product) => {
           {message}
         </div>
       )}
-      <div className="surface p-6">
-        <section className="surface p-6">
+      <div className="surface p-4 sm:p-6">
+        <section>
           <h2 className="mb-5 text-lg font-bold text-slate-900">
             Product List
           </h2>
 
-          <div className="overflow-x-auto">
+          <div className="space-y-3 md:hidden">
+            {dataLoading ? (
+              <LoadingState label="Loading shop inventory..." />
+            ) : products.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+                No products found. Add your first product.
+              </div>
+            ) : (
+              products.map((product) => {
+                const isLowStock =
+                  (product.currentStock || 0) <= (product.lowStockAlert || 0);
+
+                return (
+                  <article key={product._id} className="surface-flat p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-base font-black text-slate-900">
+                          {product.name}
+                        </h3>
+                        <p className="mt-1 text-xs font-semibold capitalize text-slate-500">
+                          {product.category} / {product.subCategory || "-"}
+                        </p>
+                      </div>
+                      <span
+                        className={`status-pill ${
+                          isLowStock
+                            ? "bg-[color:var(--shop-brick-soft)] text-red-700"
+                            : "bg-[color:var(--shop-primary-soft)] text-green-700"
+                        }`}
+                      >
+                        {isLowStock ? "Low" : "Stock"}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-1 gap-2 rounded-xl sm:grid-cols-3 bg-[color:var(--shop-panel-2)] p-3 text-sm">
+                      <div>
+                        <p className="text-xs font-bold text-slate-500">Price</p>
+                        <p className="font-black text-slate-900">₹{product.pricePerUnit}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-500">Stock</p>
+                        <p className="font-black text-slate-900">
+                          {product.currentStock || 0}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-500">Unit</p>
+                        <p className="font-black capitalize text-slate-900">{product.unit}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => openStockModal("add", product)}
+                        className="btn-success text-sm"
+                      >
+                        + Stock
+                      </button>
+                      <button
+                        onClick={() => openStockModal("adjust", product)}
+                        className="btn-muted text-sm text-orange-700"
+                      >
+                        Adjust
+                      </button>
+                      <button
+                        onClick={() => handleEdit(product)}
+                        className="btn-muted text-sm text-[color:var(--shop-primary-strong)]"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(product._id)}
+                        className="btn-muted text-sm text-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </article>
+                );
+              })
+            )}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
           <table className="shop-table w-full min-w-[980px]">
               <thead>
                 <tr className="border-b bg-slate-50 text-left text-sm text-slate-600">
@@ -199,7 +356,13 @@ const handleAdjustStock = async (product) => {
               </thead>
 
               <tbody>
-                {products.length === 0 ? (
+                {dataLoading ? (
+                  <tr>
+                    <td colSpan="8" className="bg-[color:var(--shop-panel)] px-4 py-8">
+                      <LoadingState label="Loading shop inventory..." />
+                    </td>
+                  </tr>
+                ) : products.length === 0 ? (
                   <tr>
                     <td
                       colSpan="8"
@@ -247,14 +410,14 @@ const handleAdjustStock = async (product) => {
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-2">
                             <button
-                                onClick={() => handleAddStock(product)}
+                                onClick={() => openStockModal("add", product)}
                                 className="btn-muted text-xs text-green-700"
                                 >
                                 + Stock
                                 </button>
 
                                 <button
-                                onClick={() => handleAdjustStock(product)}
+                                onClick={() => openStockModal("adjust", product)}
                                 className="btn-muted text-xs text-orange-700"
                                 >
                                 Adjust
@@ -282,7 +445,7 @@ const handleAdjustStock = async (product) => {
           </div>
         </section>
       </div>
-      <ProductFormModal
+<ProductFormModal
   open={isModalOpen}
   onClose={() => setIsModalOpen(false)}
   form={form}
@@ -292,6 +455,120 @@ const handleAdjustStock = async (product) => {
   onSubmit={handleSubmit}
   onCancelEdit={resetForm}
 />
+      {stockModal.open && (
+        <div className="mobile-sheet fixed inset-0 z-50 flex bg-black/50 sm:px-4">
+          <div className="modal-panel max-h-[92vh] w-full max-w-lg overflow-hidden">
+            <div className="flex items-center justify-between border-b px-4 py-4 sm:px-6" style={{ borderColor: "var(--shop-border)" }}>
+              <div>
+                <h2 className="text-xl font-black text-slate-900">
+                  {stockModal.mode === "add" ? "Add Stock" : "Adjust Stock"}
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  {stockModal.product?.name} currently has{" "}
+                  {stockModal.product?.currentStock || 0}{" "}
+                  {stockModal.product?.unit}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeStockModal}
+                disabled={stockLoading}
+                className="btn-muted p-2"
+              >
+                X
+              </button>
+            </div>
+
+            <form onSubmit={handleStockSubmit}>
+              <div className="space-y-4 p-4 sm:p-6">
+                <div className="grid grid-cols-2 gap-3 rounded-xl bg-[color:var(--shop-panel-2)] p-4">
+                  <div>
+                    <p className="text-xs font-bold text-slate-500">
+                      Current Stock
+                    </p>
+                    <p className="mt-1 text-xl font-black text-slate-900">
+                      {stockModal.product?.currentStock || 0}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-500">Unit</p>
+                    <p className="mt-1 text-xl font-black capitalize text-slate-900">
+                      {stockModal.product?.unit}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="field-label">
+                    {stockModal.mode === "add"
+                      ? "Quantity to add"
+                      : "Set final stock"}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={stockModal.mode === "add" ? "0.01" : "0"}
+                    value={stockModal.quantity}
+                    onChange={(e) =>
+                      setStockModal({
+                        ...stockModal,
+                        quantity: e.target.value,
+                      })
+                    }
+                    className="form-control px-4 py-3 text-lg font-bold"
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="field-label">Reason</label>
+                  <textarea
+                    rows="3"
+                    value={stockModal.reason}
+                    onChange={(e) =>
+                      setStockModal({
+                        ...stockModal,
+                        reason: e.target.value,
+                      })
+                    }
+                    className="form-control resize-none px-4 py-3"
+                    placeholder="Example: Supplier delivery"
+                  />
+                </div>
+              </div>
+
+              <div className="thumb-footer flex flex-col-reverse gap-3 border-t px-4 py-4 sm:flex-row sm:justify-end sm:px-6" style={{ borderColor: "var(--shop-border)" }}>
+                <button
+                  type="button"
+                  onClick={closeStockModal}
+                  disabled={stockLoading}
+                  className="btn-muted"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  disabled={
+                    stockLoading ||
+                    !stockModal.quantity ||
+                    Number(stockModal.quantity) < 0 ||
+                    (stockModal.mode === "add" &&
+                      Number(stockModal.quantity) <= 0)
+                  }
+                  className="btn-success"
+                >
+                  {stockLoading
+                    ? "Saving..."
+                    : stockModal.mode === "add"
+                    ? "Add Stock"
+                    : "Save Adjustment"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 };

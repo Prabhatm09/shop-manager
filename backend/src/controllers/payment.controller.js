@@ -89,7 +89,7 @@ const createPayment = async (req, res) => {
 const getPayments = async (req, res) => {
   try {
     const payments = await Payment.find({ createdBy: req.user._id })
-      .populate("order", "subTotal paidAmount dueAmount paymentStatus")
+      .populate("order", "billNumber subTotal paidAmount dueAmount paymentStatus createdAt")
       .populate("customer", "name phone address")
       .sort({ createdAt: -1 });
 
@@ -130,7 +130,7 @@ const getPaymentsByCustomer = async (req, res) => {
       customer: req.params.customerId,
       createdBy: req.user._id,
     })
-      .populate("order", "subTotal paidAmount dueAmount paymentStatus")
+      .populate("order", "billNumber subTotal paidAmount dueAmount paymentStatus createdAt")
       .sort({ createdAt: -1 });
 
     return res.json({

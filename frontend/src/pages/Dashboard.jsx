@@ -3,13 +3,15 @@ import { IndianRupee, Package, ShoppingCart, Users } from "lucide-react";
 import API from "../api/axios";
 import AppLayout from "../components/AppLayout";
 import CreateOrderModal from "../components/CreateOrderModal";
+import LoadingState from "../components/LoadingState";
 import QuickSaleModal from "../components/QuickSaleModal";
 
 
 const Dashboard = () => {
 
-   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-   const [quickSaleOpen, setQuickSaleOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [quickSaleOpen, setQuickSaleOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
   
   const [stats, setStats] = useState({
   totalProducts: 0,
@@ -22,13 +24,6 @@ const Dashboard = () => {
   lowStockProducts: [],
 });
 
-const [orderStats, setOrderStats] = useState({
-  pending: 0,
-  confirmed: 0,
-  dispatched: 0,
-  delivered: 0,
-});
-
 const [returnData, setReturnData] = useState({
   totalPendingReturns: 0,
   dueTodayCount: 0,
@@ -39,34 +34,18 @@ const [returnData, setReturnData] = useState({
 
 const fetchStats = async () => {
   try {
-    const [statsRes, returnsRes, ordersRes] = await Promise.all([
+    setLoading(true);
+    const [statsRes, returnsRes] = await Promise.all([
       API.get("/dashboard/stats"),
       API.get("/orders/returns/reminders"),
-      API.get("/orders"),
     ]);
 
     setStats(statsRes.data);
     setReturnData(returnsRes.data);
-
-    const orders = ordersRes.data.orders || [];
-
-    const statusCount = {
-      pending: 0,
-      confirmed: 0,
-      dispatched: 0,
-      delivered: 0,
-    };
-
-    orders.forEach((order) => {
-      const status = order.orderStatus || "pending";
-      if (statusCount[status] !== undefined) {
-        statusCount[status]++;
-      }
-    });
-
-    setOrderStats(statusCount);
   } catch (error) {
     console.log(error);
+  } finally {
+    setLoading(false);
   }
 };
 
@@ -164,6 +143,10 @@ const handleMarkReturned = async (orderId) => {
  
   }
     >
+      {loading ? (
+        <LoadingState label="Loading shop dashboard..." />
+      ) : (
+        <>
         
       <section className="mb-6 grid grid-cols-1 gap-5 xl:grid-cols-[1.25fr_0.9fr]">
         <div className="bill-panel p-6">
@@ -186,7 +169,7 @@ const handleMarkReturned = async (orderId) => {
 
         <div className="surface p-6">
           <p className="text-sm font-bold text-slate-500">Today’s Attention</p>
-          <div className="mt-4 grid grid-cols-3 gap-3">
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-xl bg-[color:var(--shop-brick-soft)] p-4">
               <p className="text-xs font-bold text-red-700">Low Stock</p>
               <h3 className="mt-1 text-2xl font-black text-red-800">{stats.lowStockCount || 0}</h3>
@@ -196,8 +179,10 @@ const handleMarkReturned = async (orderId) => {
               <h3 className="mt-1 text-2xl font-black text-yellow-900">{returnData.dueTodayCount}</h3>
             </div>
             <div className="rounded-xl bg-[color:var(--shop-info-soft)] p-4">
-              <p className="text-xs font-bold text-blue-800">Pending</p>
-              <h3 className="mt-1 text-2xl font-black text-blue-900">{orderStats.pending}</h3>
+              <p className="text-xs font-bold text-blue-800">Pending Returns</p>
+              <h3 className="mt-1 text-2xl font-black text-blue-900">
+                {returnData.totalPendingReturns}
+              </h3>
             </div>
           </div>
         </div>
@@ -225,41 +210,6 @@ const handleMarkReturned = async (orderId) => {
             </div>
           );
         })}
-      </div>
-      <div className="mt-8">
-        <h2 className="mb-4 text-lg font-bold text-slate-900">
-            Order Queue
-        </h2>
-
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <div className="surface-flat bg-[color:var(--shop-sand-soft)] p-5">
-            <p className="text-sm font-semibold text-yellow-700">Pending</p>
-            <h2 className="mt-2 text-2xl font-bold text-yellow-800">
-                {orderStats.pending}
-            </h2>
-            </div>
-
-            <div className="surface-flat bg-[color:var(--shop-info-soft)] p-5">
-            <p className="text-sm font-semibold text-blue-700">Confirmed</p>
-            <h2 className="mt-2 text-2xl font-bold text-blue-800">
-                {orderStats.confirmed}
-            </h2>
-            </div>
-
-            <div className="surface-flat bg-[color:var(--shop-panel)] p-5">
-            <p className="text-sm font-semibold text-purple-700">Dispatched</p>
-            <h2 className="mt-2 text-2xl font-bold text-purple-800">
-                {orderStats.dispatched}
-            </h2>
-            </div>
-
-            <div className="surface-flat bg-[color:var(--shop-primary-soft)] p-5">
-            <p className="text-sm font-semibold text-green-700">Delivered</p>
-            <h2 className="mt-2 text-2xl font-bold text-green-800">
-                {orderStats.delivered}
-            </h2>
-            </div>
-        </div>
       </div>
 
       <div className="surface mt-8 p-6">
@@ -443,6 +393,8 @@ const handleMarkReturned = async (orderId) => {
     </div>
   )}
 </div>
+        </>
+      )}
 <CreateOrderModal
   open={isCreateModalOpen}
   onClose={() => setIsCreateModalOpen(false)}

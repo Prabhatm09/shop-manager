@@ -57,6 +57,94 @@ const orderItemSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const orderAdjustmentSchema = new mongoose.Schema(
+  {
+    type: {
+      type: String,
+      enum: ["return", "discount", "extra_charge", "damage", "vaivhaar"],
+      required: true,
+    },
+
+    product: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+      default: null,
+    },
+
+    productName: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    quantity: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    unit: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    conversionToBase: {
+      type: Number,
+      default: 1,
+      min: 0,
+    },
+
+    amount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    returnRate: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    labourCharge: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    direction: {
+      type: String,
+      enum: ["credit", "debit"],
+      required: true,
+    },
+
+    stockImpact: {
+      type: String,
+      enum: ["add_to_stock", "no_stock_change"],
+      default: "no_stock_change",
+    },
+
+    condition: {
+      type: String,
+      enum: ["sealed", "loose", "damaged", "not_applicable"],
+      default: "not_applicable",
+    },
+
+    note: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { _id: true }
+);
+
 const orderSchema = new mongoose.Schema(
   {
     customer: {
@@ -73,6 +161,13 @@ const orderSchema = new mongoose.Schema(
     customerPhone: {
       type: String,
       required: true,
+    },
+
+    billNumber: {
+      type: String,
+      default: "",
+      trim: true,
+      index: true,
     },
 
     items: {
@@ -137,6 +232,11 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       min: 0,
+    },
+
+    adjustments: {
+      type: [orderAdjustmentSchema],
+      default: [],
     },
 
     rentalStartDate: {

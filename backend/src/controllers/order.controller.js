@@ -3,11 +3,56 @@ const Product = require("../models/Product");
 const Customer = require("../models/Customer");
 const StockMovement = require("../models/StockMovement");
 const Payment = require("../models/Payment");
+const Counter = require("../models/Counter");
 
 const getPaymentStatus = (subTotal, paidAmount) => {
   if (paidAmount <= 0) return "unpaid";
   if (paidAmount >= subTotal) return "paid";
   return "partial";
+};
+
+const isFiniteNumber = (value) => Number.isFinite(Number(value));
+
+const adjustmentDirectionByType = {
+  return: "credit",
+  discount: "credit",
+  vaivhaar: "credit",
+  damage: "credit",
+  extra_charge: "debit",
+};
+
+const getBillYear = (date = new Date()) => new Date(date).getFullYear();
+
+const nextBillNumber = async (userId, date = new Date()) => {
+  const year = getBillYear(date);
+  const counter = await Counter.findOneAndUpdate(
+    { scope: `bill:${userId}:${year}` },
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  );
+
+  return `RM-${year}-${String(counter.seq).padStart(4, "0")}`;
+};
+
+const ensureBillNumber = async (order, userId) => {
+  if (order.billNumber) return order;
+
+  order.billNumber = await nextBillNumber(userId, order.createdAt || new Date());
+  await order.save();
+
+  return order;
+};
+
+const ensureBillNumbers = async (orders, userId) => {
+  const sortedOrders = [...orders].sort(
+    (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+  );
+
+  for (const order of sortedOrders) {
+    await ensureBillNumber(order, userId);
+  }
+
+  return orders;
 };
 
 const createOrder = async (req, res) => {
@@ -82,19 +127,19 @@ const createOrder = async (req, res) => {
       const conversionToBase = Number(item.conversionToBase || 1);
       const selectedUnit = item.selectedUnit || product.unit;
 
-      if (!quantity || quantity <= 0) {
+      if (!isFiniteNumber(quantity) || quantity <= 0) {
         return res.status(400).json({
           message: `Invalid quantity for ${product.name}`,
         });
       }
 
-      if (pricePerUnit < 0) {
+      if (!isFiniteNumber(pricePerUnit) || pricePerUnit < 0) {
         return res.status(400).json({
           message: `Invalid price for ${product.name}`,
         });
       }
 
-      if (conversionToBase <= 0) {
+      if (!isFiniteNumber(conversionToBase) || conversionToBase <= 0) {
         return res.status(400).json({
           message: `Invalid unit conversion for ${product.name}`,
         });
@@ -134,11 +179,23 @@ const createOrder = async (req, res) => {
     const finalDeliveryCharge = Number(deliveryCharge || 0);
     const finalPaidAmount = Number(paidAmount || 0);
 
+    if (!isFiniteNumber(finalDeliveryCharge) || finalDeliveryCharge < 0) {
+      return res.status(400).json({
+        message: "Delivery charge cannot be negative",
+      });
+    }
+
     const subTotal = itemsTotal + finalDeliveryCharge;
 
-    if (finalPaidAmount < 0) {
+    if (!isFiniteNumber(finalPaidAmount) || finalPaidAmount < 0) {
       return res.status(400).json({
         message: "Paid amount cannot be negative",
+      });
+    }
+
+    if (finalPaidAmount > subTotal) {
+      return res.status(400).json({
+        message: "Paid amount cannot be greater than bill total",
       });
     }
 
@@ -149,6 +206,7 @@ const createOrder = async (req, res) => {
       customer: customer._id,
       customerName: customer.name,
       customerPhone: customer.phone,
+      billNumber: await nextBillNumber(req.user._id),
       items: orderItems,
 
       subTotal,
@@ -228,8 +286,10 @@ const getOrders = async (req, res) => {
   try {
     const orders = await Order.find({ createdBy: req.user._id })
       .populate("customer", "name phone address")
-      .populate("items.product", "name category unit pricePerUnit")
+      .populate("items.product", "name category unit pricePerUnit saleUnits")
       .sort({ createdAt: -1 });
+
+    await ensureBillNumbers(orders, req.user._id);
 
     return res.json({
       count: orders.length,
@@ -250,13 +310,15 @@ const getOrderById = async (req, res) => {
       createdBy: req.user._id,
     })
       .populate("customer", "name phone address")
-      .populate("items.product", "name category unit pricePerUnit");
+      .populate("items.product", "name category unit pricePerUnit saleUnits");
 
     if (!order) {
       return res.status(404).json({
         message: "Order not found",
       });
     }
+
+    await ensureBillNumber(order, req.user._id);
 
     return res.json({ order });
   } catch (error) {
@@ -358,8 +420,10 @@ const getOrdersByCustomer = async (req, res) => {
       createdBy: req.user._id,
     })
       .populate("customer", "name phone address")
-      .populate("items.product", "name category unit pricePerUnit")
+      .populate("items.product", "name category unit pricePerUnit saleUnits")
       .sort({ createdAt: -1 });
+
+    await ensureBillNumbers(orders, req.user._id);
 
     return res.json({
       count: orders.length,
@@ -582,6 +646,259 @@ const updateOrderStatus = async (req, res) => {
   }
 };
 
+const createOrderAdjustment = async (req, res) => {
+  try {
+    const {
+      type,
+      productId = null,
+      productName = "",
+      quantity = 0,
+      unit = "",
+      conversionToBase = 1,
+      amount,
+      returnRate,
+      labourCharge = 0,
+      stockImpact = "no_stock_change",
+      condition = "not_applicable",
+      note = "",
+    } = req.body;
+
+    if (!adjustmentDirectionByType[type]) {
+      return res.status(400).json({
+        message: "Invalid adjustment type",
+      });
+    }
+
+    if (!isFiniteNumber(quantity) || Number(quantity) < 0) {
+      return res.status(400).json({
+        message: "Adjustment quantity cannot be negative",
+      });
+    }
+
+    if (!isFiniteNumber(conversionToBase) || Number(conversionToBase) <= 0) {
+      return res.status(400).json({
+        message: "Invalid unit conversion",
+      });
+    }
+
+    if (!isFiniteNumber(labourCharge) || Number(labourCharge) < 0) {
+      return res.status(400).json({
+        message: "Labour charge cannot be negative",
+      });
+    }
+
+    const order = await Order.findOne({
+      _id: req.params.id,
+      createdBy: req.user._id,
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        message: "Order not found",
+      });
+    }
+
+    let product = null;
+    let finalProductName = productName;
+    let finalUnit = unit;
+    let finalConversionToBase = Number(conversionToBase || 1);
+    let finalReturnRate =
+      returnRate !== undefined ? Number(returnRate) : Number(amount || 0);
+    let adjustmentAmount = Number(amount || 0);
+
+    if (productId) {
+      product = await Product.findOne({
+        _id: productId,
+        createdBy: req.user._id,
+        isActive: true,
+      });
+
+      if (!product) {
+        return res.status(404).json({
+          message: "Product not found",
+        });
+      }
+
+      finalProductName = product.name;
+    }
+
+    if (type === "return") {
+      if (!productId || !product) {
+        return res.status(400).json({
+          message: "Returned item is required",
+        });
+      }
+
+      if (!isFiniteNumber(quantity) || Number(quantity) <= 0) {
+        return res.status(400).json({
+          message: "Return quantity must be greater than 0",
+        });
+      }
+
+      const orderItems = order.items.filter((item) => {
+        const itemProductId =
+          typeof item.product === "object"
+            ? item.product?._id?.toString()
+            : item.product?.toString();
+        return itemProductId === productId.toString();
+      });
+
+      if (orderItems.length === 0) {
+        return res.status(400).json({
+          message: "Returned item was not purchased in this bill",
+        });
+      }
+
+      const matchedItem =
+        orderItems.find(
+          (item) => (item.selectedUnit || item.unit) === unit
+        ) || orderItems[0];
+
+      finalUnit = unit || matchedItem.selectedUnit || matchedItem.unit;
+      finalConversionToBase = Number(
+        conversionToBase || matchedItem.conversionToBase || 1
+      );
+
+      if (!isFiniteNumber(finalReturnRate) || finalReturnRate <= 0) {
+        finalReturnRate = Number(matchedItem.pricePerUnit || 0);
+      }
+
+      if (!isFiniteNumber(finalReturnRate) || finalReturnRate <= 0) {
+        return res.status(400).json({
+          message: "Return rate must be greater than 0",
+        });
+      }
+
+      const purchasedBaseQuantity = orderItems.reduce(
+        (sum, item) =>
+          sum +
+          Number(item.quantity || 0) * Number(item.conversionToBase || 1),
+        0
+      );
+      const alreadyReturnedBaseQuantity = (order.adjustments || [])
+        .filter((entry) => {
+          const entryProductId =
+            typeof entry.product === "object"
+              ? entry.product?._id?.toString()
+              : entry.product?.toString();
+          return entry.type === "return" && entryProductId === productId.toString();
+        })
+        .reduce(
+          (sum, entry) =>
+            sum +
+            Number(entry.quantity || 0) *
+              Number(entry.conversionToBase || 1),
+          0
+        );
+      const returnBaseQuantity =
+        Number(quantity || 0) * Number(finalConversionToBase || 1);
+
+      if (
+        returnBaseQuantity >
+        purchasedBaseQuantity - alreadyReturnedBaseQuantity + 0.0001
+      ) {
+        return res.status(400).json({
+          message: "Return quantity cannot be more than remaining purchased quantity",
+        });
+      }
+
+      const grossReturnAmount = Number(quantity) * finalReturnRate;
+      adjustmentAmount = grossReturnAmount - Number(labourCharge || 0);
+
+      if (!isFiniteNumber(adjustmentAmount) || adjustmentAmount <= 0) {
+        return res.status(400).json({
+          message: "Return credit must be greater than 0 after labour charge",
+        });
+      }
+    } else if (!isFiniteNumber(amount) || Number(amount) <= 0) {
+      return res.status(400).json({
+        message: "Adjustment amount must be greater than 0",
+      });
+    }
+
+    if (stockImpact === "add_to_stock" && !product) {
+      return res.status(400).json({
+        message: "Product is required when adding returned stock",
+      });
+    }
+
+    const direction = adjustmentDirectionByType[type];
+
+    if (direction === "credit" && adjustmentAmount > Number(order.subTotal || 0)) {
+      return res.status(400).json({
+        message: "Credit amount cannot be greater than bill total",
+      });
+    }
+
+    const adjustment = {
+      type,
+      product: product ? product._id : null,
+      productName: finalProductName || "",
+      quantity: Number(quantity || 0),
+      unit: finalUnit,
+      conversionToBase: finalConversionToBase,
+      amount: adjustmentAmount,
+      returnRate: type === "return" ? finalReturnRate : 0,
+      labourCharge: Number(labourCharge || 0),
+      direction,
+      stockImpact,
+      condition,
+      note,
+      createdAt: new Date(),
+    };
+
+    order.adjustments.push(adjustment);
+
+    if (direction === "credit") {
+      order.subTotal = Math.max(Number(order.subTotal || 0) - adjustmentAmount, 0);
+    } else {
+      order.subTotal = Number(order.subTotal || 0) + adjustmentAmount;
+    }
+
+    order.dueAmount = Math.max(
+      Number(order.subTotal || 0) - Number(order.paidAmount || 0),
+      0
+    );
+    order.paymentStatus = getPaymentStatus(order.subTotal, order.paidAmount);
+
+    await order.save();
+
+    if (stockImpact === "add_to_stock" && product) {
+      const previousStock = Number(product.currentStock || 0);
+      const returnedStock =
+        Number(quantity || 0) * Number(finalConversionToBase || 1);
+      const newStock = previousStock + returnedStock;
+
+      product.currentStock = newStock;
+      await product.save();
+
+      await StockMovement.create({
+        product: product._id,
+        productName: product.name,
+        type: "stock_in",
+        quantity: returnedStock,
+        previousStock,
+        newStock,
+        reason: `Order adjustment: ${type} for ${order.customerName}`,
+        referenceType: "order",
+        referenceId: order._id,
+        createdBy: req.user._id,
+      });
+    }
+
+    return res.status(201).json({
+      message: "Order adjustment added successfully",
+      order,
+      adjustment: order.adjustments[order.adjustments.length - 1],
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Order adjustment failed",
+      error: error.message,
+    });
+  }
+};
+
 const quickSale = async (req, res) => {
   try {
     const { items, paymentMode = "cash" } = req.body;
@@ -629,9 +946,21 @@ const quickSale = async (req, res) => {
       const conversionToBase = Number(item.conversionToBase || 1);
       const selectedUnit = item.selectedUnit || product.unit;
 
-      if (quantity <= 0) {
+      if (!isFiniteNumber(quantity) || quantity <= 0) {
         return res.status(400).json({
           message: "Quantity must be greater than 0",
+        });
+      }
+
+      if (!isFiniteNumber(pricePerUnit) || pricePerUnit <= 0) {
+        return res.status(400).json({
+          message: `Invalid price for ${product.name}`,
+        });
+      }
+
+      if (!isFiniteNumber(conversionToBase) || conversionToBase <= 0) {
+        return res.status(400).json({
+          message: `Invalid unit conversion for ${product.name}`,
         });
       }
 
@@ -671,6 +1000,7 @@ const quickSale = async (req, res) => {
       customer: customer._id,
       customerName: customer.name,
       customerPhone: customer.phone,
+      billNumber: await nextBillNumber(req.user._id),
       items: orderItems,
       subTotal,
       paidAmount: subTotal,
@@ -737,5 +1067,6 @@ module.exports = {
   markOrderReturned,
   updateOrder,
   updateOrderStatus,
+  createOrderAdjustment,
   deleteOrder,
 };

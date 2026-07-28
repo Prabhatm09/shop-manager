@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import getBillNumber from "../utils/billNumber";
 
 const PaymentFormModal = ({
   open,
@@ -30,12 +31,14 @@ const PaymentFormModal = ({
 
   const isAmountInvalid =
     selectedOrder &&
-    Number(form.amount || 0) > Number(selectedOrder.dueAmount || 0);
+    (!Number.isFinite(Number(form.amount)) ||
+      Number(form.amount || 0) <= 0 ||
+      Number(form.amount || 0) > Number(selectedOrder.dueAmount || 0));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+    <div className="mobile-sheet fixed inset-0 z-50 flex bg-black/50 sm:px-4">
       <div className="modal-panel max-h-[92vh] w-full max-w-2xl overflow-hidden">
-        <div className="flex items-center justify-between border-b px-6 py-4">
+        <div className="flex items-center justify-between border-b px-4 py-4 sm:px-6">
           <div>
             <h2 className="text-xl font-bold text-slate-900">
               Receive Payment
@@ -55,7 +58,7 @@ const PaymentFormModal = ({
         </div>
 
         <form onSubmit={onSubmit}>
-          <div className="max-h-[65vh] overflow-y-auto p-6">
+          <div className="max-h-[68vh] overflow-y-auto p-4 sm:p-6">
             <div className="space-y-4">
               <div>
                 <label className="field-label">
@@ -71,7 +74,7 @@ const PaymentFormModal = ({
                   <option value="">Choose due order</option>
                   {orders.map((order) => (
                     <option key={order._id} value={order._id}>
-                      {order.customerName} | #{order._id.slice(-6).toUpperCase()} | Due ₹
+                      {order.customerName} | {getBillNumber(order)} | Due ₹
                       {order.dueAmount}
                     </option>
                   ))}
@@ -87,7 +90,7 @@ const PaymentFormModal = ({
                         {selectedOrder.customerName}
                       </h3>
                       <p className="text-sm text-slate-400">
-                        #{selectedOrder._id.slice(-6).toUpperCase()}
+                        {getBillNumber(selectedOrder)}
                       </p>
                     </div>
 
@@ -102,7 +105,7 @@ const PaymentFormModal = ({
                     </span>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
+                  <div className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
                     <div>
                       <p className="text-slate-400">Total</p>
                       <p className="font-bold">₹{selectedOrder.subTotal}</p>
@@ -140,6 +143,8 @@ const PaymentFormModal = ({
                   value={form.amount}
                   onChange={handleChange}
                   type="number"
+                  min="1"
+                  step="0.01"
                   placeholder="1000"
                   className={`w-full rounded-xl border px-4 py-3 outline-none focus:ring-4 ${
                     isAmountInvalid
@@ -150,7 +155,7 @@ const PaymentFormModal = ({
 
                 {isAmountInvalid && (
                   <p className="mt-1 text-xs font-semibold text-red-600">
-                    Amount cannot be greater than due amount.
+                    Enter an amount greater than 0 and not more than due.
                   </p>
                 )}
               </div>
@@ -202,7 +207,7 @@ const PaymentFormModal = ({
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 border-t px-6 py-4">
+          <div className="thumb-footer flex flex-col-reverse gap-3 border-t px-4 py-4 sm:flex-row sm:justify-end sm:px-6">
             <button
               type="button"
               onClick={onClose}

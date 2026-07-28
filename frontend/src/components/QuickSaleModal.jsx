@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { Minus, Plus, Trash2, X } from "lucide-react";
 import API from "../api/axios";
+import LoadingState from "./LoadingState";
 
 const getQuickSaleUnits = (product) => {
+  if (product.saleUnits?.length) {
+    return product.saleUnits.map((unit) => ({
+      unit: unit.unit,
+      conversionToBase: Number(unit.conversionToBase || 1),
+      defaultPrice: Number(unit.pricePerUnit || product.pricePerUnit || 0),
+    }));
+  }
+
   const price = Number(product.pricePerUnit || 0);
   const subCategory = product.subCategory?.toLowerCase();
 
@@ -33,20 +42,29 @@ const getQuickSaleUnits = (product) => {
   ];
 };
 
+const toNumber = (value) => Number(value);
+const isValidNumber = (value) => Number.isFinite(toNumber(value));
+const safeNumber = (value, fallback = 0) =>
+  isValidNumber(value) ? toNumber(value) : fallback;
+
 const QuickSaleModal = ({ open, onClose }) => {
   const [products, setProducts] = useState([]);
   const [selectedItems, setSelectedItems] = useState([]);
   const [paymentMode, setPaymentMode] = useState("cash");
   const [search, setSearch] = useState("");
   const [message, setMessage] = useState("");
+  const [dataLoading, setDataLoading] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const fetchProducts = async () => {
     try {
+      setDataLoading(true);
       const res = await API.get("/products");
       setProducts(res.data.products || []);
     } catch (error) {
       setMessage(error.response?.data?.message || "Failed to load products");
+    } finally {
+      setDataLoading(false);
     }
   };
 
@@ -64,10 +82,19 @@ const QuickSaleModal = ({ open, onClose }) => {
   }, [products, search]);
 
   const totalAmount = selectedItems.reduce((sum, item) => {
-    return sum + Number(item.quantity || 0) * Number(item.pricePerUnit || 0);
+    return sum + safeNumber(item.quantity) * safeNumber(item.pricePerUnit);
   }, 0);
 
   const addProduct = (product) => {
+    const existingIndex = selectedItems.findIndex(
+      (item) => item.productId === product._id
+    );
+
+    if (existingIndex >= 0) {
+      increaseQty(existingIndex);
+      return;
+    }
+
     const unitOptions = getQuickSaleUnits(product);
     const defaultUnit = unitOptions[0];
 
@@ -85,6 +112,38 @@ const QuickSaleModal = ({ open, onClose }) => {
         pricePerUnit: defaultUnit.defaultPrice,
       },
     ]);
+  };
+
+  const getValidationError = () => {
+    if (selectedItems.length === 0) return "Please add at least one item";
+
+    for (const item of selectedItems) {
+      const quantity = toNumber(item.quantity);
+      const pricePerUnit = toNumber(item.pricePerUnit);
+      const conversionToBase = toNumber(item.conversionToBase || 1);
+
+      if (!isValidNumber(item.quantity) || quantity <= 0) {
+        return `Enter a valid quantity for ${item.name}`;
+      }
+
+      if (!isValidNumber(item.pricePerUnit) || pricePerUnit <= 0) {
+        return `Enter a valid rate for ${item.name}`;
+      }
+
+      if (!isValidNumber(item.conversionToBase) || conversionToBase <= 0) {
+        return `Invalid unit conversion for ${item.name}`;
+      }
+
+      if (quantity * conversionToBase > Number(item.currentStock || 0)) {
+        return `${item.name} stock not enough`;
+      }
+    }
+
+    if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+      return "Sale total is not valid";
+    }
+
+    return "";
   };
 
   const updateItem = (index, field, value) => {
@@ -151,29 +210,10 @@ const QuickSaleModal = ({ open, onClose }) => {
     try {
       setMessage("");
 
-      if (selectedItems.length === 0) {
-        setMessage("Please add at least one item");
+      const validationError = getValidationError();
+      if (validationError) {
+        setMessage(validationError);
         return;
-      }
-
-      for (const item of selectedItems) {
-        if (!item.quantity || Number(item.quantity) <= 0) {
-          setMessage(`Invalid quantity for ${item.name}`);
-          return;
-        }
-
-        if (!item.pricePerUnit || Number(item.pricePerUnit) <= 0) {
-          setMessage(`Invalid price for ${item.name}`);
-          return;
-        }
-
-        const stockDeduct =
-          Number(item.quantity || 0) * Number(item.conversionToBase || 1);
-
-        if (stockDeduct > item.currentStock) {
-          setMessage(`${item.name} stock not enough`);
-          return;
-        }
       }
 
       setLoading(true);
@@ -205,7 +245,7 @@ const QuickSaleModal = ({ open, onClose }) => {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+    <div className="mobile-sheet fixed inset-0 z-50 flex bg-black/50 sm:px-4">
       <div className="modal-panel max-h-[94vh] w-full max-w-6xl overflow-hidden">
         <div className="flex items-center justify-between border-b px-6 py-4">
           <div>
@@ -237,7 +277,13 @@ const QuickSaleModal = ({ open, onClose }) => {
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_420px]">
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_420px]">
+            {dataLoading ? (
+              <div className="xl:col-span-2">
+                <LoadingState label="Loading counter products..." />
+              </div>
+            ) : (
+              <>
             <section>
               <input
                 value={search}
@@ -299,7 +345,7 @@ const QuickSaleModal = ({ open, onClose }) => {
               </div>
             </section>
 
-            <aside className="surface-flat sticky top-4 self-start p-5">
+            <aside className="surface-flat xl:sticky xl:top-4 xl:self-start p-5">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-lg font-bold text-slate-900">
                   Sale Items
@@ -323,12 +369,11 @@ const QuickSaleModal = ({ open, onClose }) => {
                 ) : (
                   selectedItems.map((item, index) => {
                     const lineTotal =
-                      Number(item.quantity || 0) *
-                      Number(item.pricePerUnit || 0);
+                      safeNumber(item.quantity) * safeNumber(item.pricePerUnit);
 
                     const stockDeduct =
-                      Number(item.quantity || 0) *
-                      Number(item.conversionToBase || 1);
+                      safeNumber(item.quantity) *
+                      safeNumber(item.conversionToBase, 1);
 
                     return (
                       <div
@@ -395,6 +440,7 @@ const QuickSaleModal = ({ open, onClose }) => {
                                 <input
                                   type="number"
                                   step="0.01"
+                                  min="0.01"
                                   value={item.quantity}
                                   onChange={(e) =>
                                     updateItem(
@@ -422,6 +468,8 @@ const QuickSaleModal = ({ open, onClose }) => {
                               </label>
                               <input
                                 type="number"
+                                min="0.01"
+                                step="0.01"
                                 value={item.pricePerUnit}
                                 onChange={(e) =>
                                   updateItem(
@@ -466,10 +514,12 @@ const QuickSaleModal = ({ open, onClose }) => {
                 </div>
               </div>
             </aside>
+              </>
+            )}
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+        <div className="thumb-footer flex flex-col-reverse gap-3 border-t border-slate-200 px-4 py-4 sm:flex-row sm:justify-end sm:px-6">
           <button
             type="button"
             onClick={resetAndClose}
@@ -480,7 +530,7 @@ const QuickSaleModal = ({ open, onClose }) => {
 
           <button
             type="button"
-            disabled={loading || selectedItems.length === 0}
+            disabled={dataLoading || loading || selectedItems.length === 0}
             onClick={handleSubmit}
             className="btn-success"
           >

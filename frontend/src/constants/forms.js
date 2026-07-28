@@ -13,6 +13,8 @@ const initialProductForm = {
   currentStock: "",
   lowStockAlert: "10",
   description: "",
+  saleUnits: [],
+  quickQuantities: "",
 };
 
 const initialCustomerForm = {

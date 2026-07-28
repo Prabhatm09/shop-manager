@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import API from "../api/axios";
 import AppLayout from "../components/AppLayout";
 import CustomerFormModal from "../components/CustomerFormModal";
+import LoadingState from "../components/LoadingState";
 import { initialCustomerForm } from "../constants/forms";
 
 const Customers = () => {
@@ -13,15 +14,19 @@ const Customers = () => {
  const [form, setForm] = useState(initialCustomerForm);
 const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [dataLoading, setDataLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
   const fetchCustomers = async () => {
     try {
+      setDataLoading(true);
       const res = await API.get("/customers");
       setCustomers(res.data.customers || []);
     } catch (error) {
       setMessage(error.response?.data?.message || "Failed to load customers");
+    } finally {
+      setDataLoading(false);
     }
   };
 
@@ -112,14 +117,67 @@ const handleEdit = (customer) => {
         </div>
       )}
       
-     <div className="surface p-6">
+     <div className="surface p-4 sm:p-6">
 
-        <section className="surface p-6">
+        <section>
           <h2 className="mb-5 text-lg font-bold text-slate-900">
             Customer List
           </h2>
 
-          <div className="overflow-x-auto">
+          <div className="space-y-3 md:hidden">
+            {dataLoading ? (
+              <LoadingState label="Loading shop customers..." />
+            ) : customers.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+                No customers found. Add your first customer.
+              </div>
+            ) : (
+              customers.map((customer) => (
+                <article key={customer._id} className="surface-flat p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-base font-black text-slate-900">
+                        {customer.name}
+                      </h3>
+                      <p className="mt-1 text-sm font-semibold text-slate-500">
+                        {customer.phone}
+                      </p>
+                    </div>
+                    <p className="rounded-xl bg-[color:var(--shop-brick-soft)] px-3 py-2 text-sm font-black text-red-700">
+                      ₹{customer.openingDue || 0}
+                    </p>
+                  </div>
+
+                  <p className="mt-3 rounded-xl bg-[color:var(--shop-panel-2)] p-3 text-sm font-medium text-slate-600">
+                    {customer.address || "No address added"}
+                  </p>
+
+                  <div className="mt-4 grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => navigate(`/customers/${customer._id}`)}
+                      className="btn-success text-sm"
+                    >
+                      View
+                    </button>
+                    <button
+                      onClick={() => handleEdit(customer)}
+                      className="btn-muted text-sm text-green-700"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(customer._id)}
+                      className="btn-muted text-sm text-red-700"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
             <table className="shop-table w-full min-w-[760px]">
               <thead>
                 <tr className="border-b bg-slate-50 text-left text-sm text-slate-600">
@@ -132,7 +190,13 @@ const handleEdit = (customer) => {
               </thead>
 
               <tbody>
-                {customers.length === 0 ? (
+                {dataLoading ? (
+                  <tr>
+                    <td colSpan="5" className="bg-[color:var(--shop-panel)] px-4 py-8">
+                      <LoadingState label="Loading shop customers..." />
+                    </td>
+                  </tr>
+                ) : customers.length === 0 ? (
                   <tr>
                     <td
                       colSpan="5"
