@@ -115,8 +115,8 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
   );
 
   return (
-    <div className="shop-shell min-h-screen lg:flex">
-      <aside className="shop-sidebar fixed inset-y-0 left-0 hidden w-72 border-r lg:block">
+    <div className="shop-shell min-h-screen lg:grid lg:grid-cols-[18rem_minmax(0,1fr)]">
+      <aside className="shop-sidebar hidden h-screen border-r lg:sticky lg:top-0 lg:block">
         {sidebarContent}
       </aside>
 
@@ -145,7 +145,7 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
         </div>
       )}
 
-      <div className="min-h-screen flex-1 lg:ml-72">
+      <div className="min-w-0 min-h-screen">
         <header className="shop-header sticky top-0 z-30 border-b px-6 py-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-start gap-3">

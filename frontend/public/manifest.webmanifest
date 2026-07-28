@@ -1,0 +1,26 @@
+{
+  "name": "RM Trader Shop Manager",
+  "short_name": "RM Trader",
+  "description": "Counter, stock, ledger, orders and invoices for RM Trader.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f7f3ea",
+  "theme_color": "#026a3a",
+  "categories": ["business", "productivity", "shopping"],
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
