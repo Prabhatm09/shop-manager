@@ -8,23 +8,26 @@ import {
   Store,
   ShoppingCart,
   IndianRupee,
-  Menu,
+  Truck,
   X,
+  UserRound,
+  MoreHorizontal,
 } from "lucide-react";
 
 const AppLayout = ({ children, title, subtitle, headerAction }) => {
   const navigate = useNavigate();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const user = JSON.parse(localStorage.getItem("shop_user"));
+  const shopName = user?.shopName || "RM Trader";
 
   const logout = () => {
     localStorage.removeItem("shop_token");
     localStorage.removeItem("shop_user");
-    setMobileMenuOpen(false);
+    setMoreOpen(false);
     navigate("/signin");
   };
 
-  const navItems = [
+  const desktopNavItems = [
     {
       label: "Dashboard",
       path: "/dashboard",
@@ -50,6 +53,57 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
       path: "/payments",
       icon: IndianRupee,
     },
+    {
+      label: "Suppliers",
+      path: "/suppliers",
+      icon: Truck,
+    },
+    {
+      label: "Profile",
+      path: "/profile",
+      icon: UserRound,
+    },
+  ];
+
+  const mobileNavItems = [
+    {
+      label: "Dashboard",
+      path: "/dashboard",
+      icon: LayoutDashboard,
+    },
+    {
+      label: "Orders",
+      path: "/orders",
+      icon: ShoppingCart,
+    },
+    {
+      label: "Customers",
+      path: "/customers",
+      icon: Users,
+    },
+    {
+      label: "Products",
+      path: "/products",
+      icon: Package,
+    },
+  ];
+
+  const moreItems = [
+    {
+      label: "Payments",
+      path: "/payments",
+      icon: IndianRupee,
+    },
+    {
+      label: "Suppliers",
+      path: "/suppliers",
+      icon: Truck,
+    },
+    {
+      label: "Profile",
+      path: "/profile",
+      icon: UserRound,
+    },
   ];
 
   const sidebarContent = (
@@ -58,12 +112,20 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
         className="flex items-center gap-3 border-b px-6 py-5"
         style={{ borderColor: "var(--shop-border)" }}
       >
-        <div className="brand-mark flex h-12 w-12 items-center justify-center rounded-xl text-white">
-          <Store size={26} />
-        </div>
+        {user?.logoUrl ? (
+          <img
+            src={user.logoUrl}
+            alt=""
+            className="h-12 w-12 rounded-xl object-cover"
+          />
+        ) : (
+          <div className="brand-mark flex h-12 w-12 items-center justify-center rounded-xl text-white">
+            <Store size={26} />
+          </div>
+        )}
 
         <div>
-          <h2 className="text-lg font-black text-slate-900">RM Trader</h2>
+          <h2 className="text-lg font-black text-slate-900">{shopName}</h2>
           <p className="text-xs font-semibold text-slate-500">
             Counter, stock and ledger
           </p>
@@ -71,14 +133,13 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
       </div>
 
       <nav className="flex-1 space-y-2 px-4 py-5">
-        {navItems.map((item) => {
+        {desktopNavItems.map((item) => {
           const Icon = item.icon;
 
           return (
             <NavLink
               key={item.path}
               to={item.path}
-              onClick={() => setMobileMenuOpen(false)}
               className={({ isActive }) =>
                 `nav-link flex items-center gap-3 px-4 py-3 text-sm font-bold ${
                   isActive ? "nav-link-active" : "nav-link-idle"
@@ -120,27 +181,64 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
         {sidebarContent}
       </aside>
 
-      {mobileMenuOpen && (
+      {moreOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
             type="button"
-            aria-label="Close navigation"
+            aria-label="Close more menu"
             className="absolute inset-0 bg-slate-950/45"
-            onClick={() => setMobileMenuOpen(false)}
+            onClick={() => setMoreOpen(false)}
           />
 
-          <aside className="shop-sidebar relative h-full w-[82vw] max-w-80 border-r">
-            <div className="absolute right-3 top-3 z-10">
+          <aside className="absolute inset-x-0 bottom-0 rounded-t-3xl border-t border-slate-200 bg-white p-4 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-black text-slate-950">More</p>
+                <p className="text-xs font-semibold text-slate-500">
+                  Payments, suppliers and settings
+                </p>
+              </div>
               <button
                 type="button"
                 aria-label="Close menu"
                 className="btn-muted p-2"
-                onClick={() => setMobileMenuOpen(false)}
+                onClick={() => setMoreOpen(false)}
               >
                 <X size={20} />
               </button>
             </div>
-            {sidebarContent}
+
+            <div className="grid grid-cols-2 gap-2">
+              {moreItems.map((item) => {
+                const Icon = item.icon;
+
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setMoreOpen(false)}
+                    className={({ isActive }) =>
+                      `flex min-h-14 items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-black ${
+                        isActive
+                          ? "border-amber-200 bg-amber-50 text-amber-700"
+                          : "border-slate-200 bg-white text-slate-700"
+                      }`
+                    }
+                  >
+                    <Icon size={19} />
+                    {item.label}
+                  </NavLink>
+                );
+              })}
+              <button
+                type="button"
+                onClick={logout}
+                className="flex min-h-14 items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-700"
+              >
+                <LogOut size={19} />
+                Logout
+              </button>
+            </div>
           </aside>
         </div>
       )}
@@ -148,23 +246,15 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
       <div className="min-w-0 min-h-screen">
         <header className="shop-header sticky top-0 z-30 border-b px-6 py-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-start gap-3">
-              <button
-                type="button"
-                aria-label="Open navigation"
-                className="btn-muted mt-0.5 p-2 lg:hidden"
-                onClick={() => setMobileMenuOpen(true)}
-              >
-                <Menu size={20} />
-              </button>
-              <div>
-                <h1 className="text-2xl font-black text-slate-950">{title}</h1>
-                {subtitle && (
-                  <p className="mt-1 text-sm font-medium text-slate-500">
-                    {subtitle}
-                  </p>
-                )}
-              </div>
+            <div>
+              <h1 className="text-xl font-black text-slate-950 sm:text-2xl">
+                {title}
+              </h1>
+              {subtitle && (
+                <p className="mt-1 text-sm font-medium text-slate-500">
+                  {subtitle}
+                </p>
+              )}
             </div>
 
             {headerAction && (
@@ -172,14 +262,14 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
             )}
           </div>
         </header>
-        <main className="pb-24 p-4 sm:p-5 md:p-6 lg:pb-6">{children}</main>
+        <main className="p-4 pb-24 sm:p-5 md:p-6 lg:pb-6">{children}</main>
       </div>
 
       <nav
         className="mobile-bottom-nav fixed inset-x-0 bottom-0 z-40 border-t px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 lg:hidden"
       >
         <div className="grid grid-cols-5 gap-1">
-          {navItems.map((item) => {
+          {mobileNavItems.map((item) => {
             const Icon = item.icon;
 
             return (
@@ -199,6 +289,14 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
               </NavLink>
             );
           })}
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            className="mobile-bottom-link flex flex-col items-center justify-center gap-1 rounded-xl px-1 text-[11px] font-black text-slate-500"
+          >
+            <MoreHorizontal size={20} />
+            <span className="leading-none">More</span>
+          </button>
         </div>
       </nav>
     </div>

@@ -3,26 +3,41 @@
 @tailwind utilities;
 
 :root {
-  --shop-bg: oklch(0.965 0.012 83);
-  --shop-panel: oklch(0.992 0.006 83);
-  --shop-panel-2: oklch(0.955 0.012 83);
-  --shop-border: oklch(0.865 0.018 83);
-  --shop-text: oklch(0.22 0.018 72);
-  --shop-muted: oklch(0.49 0.025 74);
-  --shop-primary: oklch(0.42 0.105 154);
-  --shop-primary-strong: oklch(0.34 0.105 154);
-  --shop-primary-soft: oklch(0.93 0.045 154);
-  --shop-brick: oklch(0.53 0.14 35);
-  --shop-brick-soft: oklch(0.94 0.04 35);
-  --shop-sand: oklch(0.77 0.115 82);
-  --shop-sand-soft: oklch(0.94 0.05 82);
-  --shop-cement: oklch(0.79 0.018 84);
-  --shop-cement-soft: oklch(0.955 0.01 84);
-  --shop-steel: oklch(0.43 0.02 245);
-  --shop-info: oklch(0.48 0.095 230);
-  --shop-info-soft: oklch(0.93 0.035 230);
-  --shop-shadow: 0 18px 45px oklch(0.28 0.03 70 / 0.09);
-  --shop-shadow-sm: 0 8px 22px oklch(0.28 0.03 70 / 0.06);
+  --background: #f6f8fb;
+  --surface: #ffffff;
+  --primary: #1e293b;
+  --primary-hover: #0f172a;
+  --accent: #f59e0b;
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --danger: #dc2626;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --border: #e2e8f0;
+  --muted: #eef3f8;
+  --shop-bg: var(--background);
+  --shop-panel: var(--surface);
+  --shop-panel-2: var(--muted);
+  --shop-border: var(--border);
+  --shop-text: var(--text-primary);
+  --shop-muted: var(--text-secondary);
+  --shop-primary: var(--primary);
+  --shop-primary-strong: var(--primary-hover);
+  --shop-primary-soft: #f8fafc;
+  --shop-accent: var(--accent);
+  --shop-accent-soft: #fef3c7;
+  --shop-brick: var(--danger);
+  --shop-brick-soft: #fee2e2;
+  --shop-sand: var(--warning);
+  --shop-sand-soft: #fef3c7;
+  --shop-cement: #94a3b8;
+  --shop-cement-soft: #f8fafc;
+  --shop-steel: #475569;
+  --shop-info: #475569;
+  --shop-info-soft: #f1f5f9;
+  --shop-shadow: 0 18px 45px rgb(15 23 42 / 0.1);
+  --shop-shadow-sm: 0 10px 24px rgb(15 23 42 / 0.06);
+  --shop-ring: 0 0 0 1px rgb(255 255 255 / 0.74) inset;
 }
 
 * {
@@ -34,12 +49,7 @@ body {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
   color: var(--shop-text);
-  background:
-    linear-gradient(90deg, oklch(0.82 0.012 83 / 0.16) 1px, transparent 1px),
-    linear-gradient(180deg, oklch(0.82 0.012 83 / 0.12) 1px, transparent 1px),
-    linear-gradient(180deg, oklch(0.985 0.01 83), var(--shop-bg) 360px),
-    var(--shop-bg);
-  background-size: 44px 44px, 44px 44px, auto, auto;
+  background: var(--shop-bg);
 }
 
 button,
@@ -52,44 +62,44 @@ textarea {
 @layer components {
   .shop-shell {
     background:
-      linear-gradient(135deg, oklch(0.55 0.06 72 / 0.045) 25%, transparent 25%) 0 0 / 18px 18px,
-      linear-gradient(315deg, oklch(0.55 0.06 72 / 0.035) 25%, transparent 25%) 0 0 / 18px 18px,
-      linear-gradient(180deg, oklch(0.985 0.01 83), var(--shop-bg) 420px);
+      radial-gradient(circle at 12% -10%, rgb(245 158 11 / 0.16), transparent 30rem),
+      radial-gradient(circle at 90% 0, rgb(30 41 59 / 0.08), transparent 26rem),
+      linear-gradient(180deg, #fffdf7 0, var(--shop-bg) 24rem),
+      var(--shop-bg);
   }
 
   .shop-sidebar {
     border-color: var(--shop-border);
-    background: oklch(0.982 0.008 83);
-    box-shadow: 12px 0 32px oklch(0.3 0.02 70 / 0.04);
+    background: rgb(255 255 255 / 0.96);
+    box-shadow: 10px 0 30px rgb(15 23 42 / 0.04);
   }
 
   .shop-header {
     border-color: var(--shop-border);
-    background:
-      linear-gradient(90deg, oklch(0.58 0.09 154 / 0.08), transparent 44%),
-      oklch(0.992 0.006 83 / 0.92);
-    backdrop-filter: blur(14px);
+    background: rgb(255 255 255 / 0.86);
+    backdrop-filter: blur(10px);
   }
 
   .brand-mark {
-    border: 1px solid oklch(0.58 0.08 154);
+    border: 1px solid #334155;
     background:
-      linear-gradient(135deg, var(--shop-primary), var(--shop-primary-strong)),
-      repeating-linear-gradient(0deg, transparent 0 12px, oklch(0.985 0.006 83 / 0.16) 12px 13px);
-    box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.22), 0 10px 22px oklch(0.4 0.09 154 / 0.22);
+      linear-gradient(180deg, #334155, var(--shop-primary)),
+      var(--shop-primary);
+    box-shadow: var(--shop-ring), 0 12px 24px rgb(15 23 42 / 0.22);
   }
 
   .nav-link {
     border: 1px solid transparent;
-    border-radius: 10px;
+    border-radius: 14px;
     transition: background-color 180ms ease-out, color 180ms ease-out,
-      border-color 180ms ease-out, transform 180ms ease-out;
+      border-color 180ms ease-out;
   }
 
   .nav-link-active {
-    border-color: oklch(0.72 0.08 154);
-    background: var(--shop-primary-soft);
-    color: var(--shop-primary-strong);
+    border-color: #fde68a;
+    background: linear-gradient(180deg, #fffbeb, var(--shop-accent-soft));
+    color: #92400e;
+    box-shadow: var(--shop-ring), 0 8px 18px rgb(245 158 11 / 0.12);
   }
 
   .nav-link-idle {
@@ -98,43 +108,40 @@ textarea {
 
   .nav-link-idle:hover {
     border-color: var(--shop-border);
-    background: oklch(0.965 0.012 83);
+    background: #f8fafc;
     color: var(--shop-text);
   }
 
   .surface {
     border: 1px solid var(--shop-border);
-    border-radius: 14px;
+    border-radius: 18px;
     background:
-      linear-gradient(180deg, oklch(0.998 0.004 83), var(--shop-panel)),
+      linear-gradient(180deg, #ffffff, #fbfdff),
       var(--shop-panel);
     box-shadow: var(--shop-shadow-sm);
   }
 
   .surface-flat {
     border: 1px solid var(--shop-border);
-    border-radius: 12px;
-    background: var(--shop-panel);
+    border-radius: 16px;
+    background:
+      linear-gradient(180deg, #ffffff, #fbfdff),
+      var(--shop-panel);
   }
 
   .metric-card {
     position: relative;
     overflow: hidden;
     border: 1px solid var(--shop-border);
-    border-radius: 14px;
+    border-radius: 18px;
     background:
-      linear-gradient(180deg, var(--shop-panel), oklch(0.975 0.01 83)),
-      repeating-linear-gradient(90deg, transparent 0 28px, oklch(0.82 0.012 83 / 0.16) 28px 29px);
-    box-shadow: var(--shop-shadow-sm);
+      linear-gradient(180deg, #ffffff, #fbfdff),
+      var(--shop-panel);
+    box-shadow: var(--shop-ring), var(--shop-shadow-sm);
   }
 
   .metric-card::after {
-    content: "";
-    position: absolute;
-    inset: auto 18px 0 18px;
-    height: 3px;
-    border-radius: 999px 999px 0 0;
-    background: var(--metric-color, var(--shop-primary));
+    content: none;
   }
 
   .btn-primary,
@@ -145,20 +152,20 @@ textarea {
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: 10px;
+    border-radius: 14px;
     border: 1px solid transparent;
     padding: 0.7rem 1rem;
     font-weight: 750;
     min-height: 44px;
     line-height: 1;
-    transition: background-color 180ms ease-out, border-color 180ms ease-out,
-      color 180ms ease-out, transform 180ms ease-out, box-shadow 180ms ease-out;
+    transition: background-color 160ms ease-out, border-color 160ms ease-out,
+      color 160ms ease-out, box-shadow 160ms ease-out, transform 160ms ease-out;
   }
 
   .btn-primary {
-    background: var(--shop-primary);
-    color: oklch(0.985 0.006 83);
-    box-shadow: 0 10px 24px oklch(0.42 0.105 154 / 0.22);
+    background: linear-gradient(180deg, #334155, var(--shop-primary));
+    color: #ffffff;
+    box-shadow: var(--shop-ring), 0 12px 24px rgb(15 23 42 / 0.22);
   }
 
   .btn-primary:hover {
@@ -167,19 +174,26 @@ textarea {
   }
 
   .btn-success {
-    background: var(--shop-primary);
-    color: oklch(0.985 0.006 83);
+    background: linear-gradient(180deg, #22c55e, var(--success));
+    color: #ffffff;
+    box-shadow: var(--shop-ring), 0 10px 20px rgb(22 163 74 / 0.16);
   }
 
   .btn-danger {
-    background: var(--shop-brick);
-    color: oklch(0.985 0.006 83);
+    background: linear-gradient(180deg, #ef4444, var(--danger));
+    color: #ffffff;
   }
 
   .btn-muted {
     border-color: var(--shop-border);
-    background: oklch(0.965 0.01 83);
+    background: linear-gradient(180deg, #ffffff, #f8fafc);
     color: var(--shop-text);
+    box-shadow: var(--shop-ring);
+  }
+
+  .btn-muted:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
   }
 
   .btn-primary:disabled,
@@ -187,8 +201,8 @@ textarea {
   .btn-danger:disabled,
   .btn-muted:disabled {
     cursor: not-allowed;
-    background: oklch(0.88 0.012 83);
-    color: oklch(0.56 0.018 83);
+    background: #e2e8f0;
+    color: #94a3b8;
     box-shadow: none;
     transform: none;
   }
@@ -197,8 +211,8 @@ textarea {
     width: 100%;
     min-height: 44px;
     border: 1px solid var(--shop-border);
-    border-radius: 10px;
-    background: oklch(0.995 0.004 83);
+    border-radius: 14px;
+    background: #ffffff;
     color: var(--shop-text);
     outline: none;
     transition: border-color 160ms ease-out, box-shadow 160ms ease-out,
@@ -206,14 +220,14 @@ textarea {
   }
 
   .form-control:focus {
-    border-color: oklch(0.57 0.1 154);
-    background: oklch(0.998 0.003 83);
-    box-shadow: 0 0 0 4px oklch(0.82 0.07 154 / 0.32);
+    border-color: var(--shop-primary);
+    background: var(--shop-panel);
+    box-shadow: 0 0 0 4px rgb(245 158 11 / 0.18);
   }
 
   .form-control:disabled {
     cursor: not-allowed;
-    background: oklch(0.94 0.01 83);
+    background: var(--shop-panel-2);
     color: var(--shop-muted);
   }
 
@@ -233,8 +247,7 @@ textarea {
   }
 
   .shop-table thead tr {
-    background:
-      linear-gradient(180deg, var(--shop-cement-soft), oklch(0.925 0.012 83));
+    background: linear-gradient(180deg, #f8fafc, #eef3f8);
   }
 
   .shop-table th {
@@ -248,7 +261,7 @@ textarea {
   }
 
   .shop-table td {
-    border-bottom: 1px solid oklch(0.9 0.012 83);
+    border-bottom: 1px solid var(--shop-border);
     background: var(--shop-panel);
     vertical-align: top;
   }
@@ -258,7 +271,7 @@ textarea {
   }
 
   .shop-table tbody tr:hover td {
-    background: oklch(0.975 0.012 83);
+    background: #f8fbff;
   }
 
   .shop-table tbody tr:last-child td {
@@ -276,18 +289,18 @@ textarea {
   }
 
   .toast {
-    border: 1px solid oklch(0.77 0.08 154);
-    border-radius: 12px;
-    background: var(--shop-primary-soft);
-    color: var(--shop-primary-strong);
+    border: 1px solid #fde68a;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #fffbeb, var(--shop-accent-soft));
+    color: #92400e;
     box-shadow: var(--shop-shadow-sm);
   }
 
   .modal-panel {
     border: 1px solid var(--shop-border);
-    border-radius: 16px;
+    border-radius: 20px;
     background:
-      linear-gradient(180deg, oklch(0.998 0.004 83), var(--shop-panel) 180px),
+      linear-gradient(180deg, #ffffff, #fbfdff),
       var(--shop-panel);
     box-shadow: var(--shop-shadow);
   }
@@ -309,25 +322,23 @@ textarea {
 
   .mobile-bottom-nav {
     border-color: var(--shop-border);
-    background:
-      linear-gradient(180deg, oklch(0.998 0.004 83 / 0.96), var(--shop-panel)),
-      var(--shop-panel);
+    background: rgb(255 255 255 / 0.94);
     box-shadow: 0 -14px 34px oklch(0.28 0.03 70 / 0.12);
-    backdrop-filter: blur(14px);
+    backdrop-filter: blur(12px);
   }
 
   .mobile-bottom-link {
     position: relative;
-    min-height: 58px;
+    min-height: 60px;
     border: 1px solid transparent;
     transition: background-color 180ms ease-out, color 180ms ease-out,
-      border-color 180ms ease-out, transform 180ms ease-out;
+      border-color 180ms ease-out;
   }
 
   .mobile-bottom-link-active {
-    border-color: oklch(0.74 0.08 154);
-    background: var(--shop-primary-soft);
-    color: var(--shop-primary-strong);
+    border-color: #fde68a;
+    background: linear-gradient(180deg, #fffbeb, var(--shop-accent-soft));
+    color: #92400e;
   }
 
   .mobile-bottom-link-active::before {
@@ -337,7 +348,7 @@ textarea {
     width: 22px;
     height: 3px;
     border-radius: 999px;
-    background: var(--shop-primary);
+    background: linear-gradient(90deg, #fbbf24, var(--shop-accent));
   }
 
   .construction-loader {
@@ -455,12 +466,13 @@ textarea {
   }
 
   .bill-panel {
-    border: 1px solid oklch(0.31 0.025 72);
-    border-radius: 14px;
+    border: 1px solid #334155;
+    border-radius: 18px;
     background:
-      linear-gradient(180deg, oklch(0.25 0.025 72), oklch(0.2 0.02 72));
-    color: oklch(0.965 0.01 83);
-    box-shadow: var(--shop-shadow-sm);
+      radial-gradient(circle at 16% 0, rgb(245 158 11 / 0.2), transparent 14rem),
+      linear-gradient(180deg, #172554, #0f172a);
+    color: #eff6ff;
+    box-shadow: var(--shop-ring), var(--shop-shadow-sm);
   }
 
   @media (max-width: 640px) {

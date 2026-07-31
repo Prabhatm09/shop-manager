@@ -14,6 +14,17 @@ const PaymentFormModal = ({
   if (!open) return null;
 
   const handleChange = (e) => {
+    if (e.target.name === "orderId") {
+      const nextOrder = orders.find((order) => order._id === e.target.value);
+
+      setForm({
+        ...form,
+        orderId: e.target.value,
+        amount: nextOrder ? String(nextOrder.dueAmount || "") : "",
+      });
+      return;
+    }
+
     setForm({
       ...form,
       [e.target.name]: e.target.value,

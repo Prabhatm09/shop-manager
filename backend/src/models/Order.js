@@ -5,7 +5,7 @@ const orderItemSchema = new mongoose.Schema(
     product: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Product",
-      required: true,
+      default: null,
     },
 
     productName: {
@@ -48,6 +48,36 @@ const orderItemSchema = new mongoose.Schema(
     },
 
     baseQuantity: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    source: {
+      type: String,
+      enum: ["shop_stock", "outsourced"],
+      default: "shop_stock",
+    },
+
+    supplier: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Supplier",
+      default: null,
+    },
+
+    supplierName: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    supplierRate: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    supplierAmount: {
       type: Number,
       default: 0,
       min: 0,

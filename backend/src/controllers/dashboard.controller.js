@@ -13,19 +13,8 @@ const getDashboardStats = async (req, res) => {
     const totalCustomers = await Customer.countDocuments({ createdBy: userId });
     const totalOrders = await Order.countDocuments({ createdBy: userId });
     const customers = await Customer.find({ createdBy: userId }).select(
-      "openingDue openingDuePaid"
+      "_id openingDue openingDuePaid"
     );
-
-    const openingDueBalance = customers.reduce((sum, customer) => {
-      return (
-        sum +
-        Math.max(
-          Number(customer.openingDue || 0) -
-            Number(customer.openingDuePaid || 0),
-          0
-        )
-      );
-    }, 0);
 
     const openingDuePaid = customers.reduce(
       (sum, customer) => sum + Number(customer.openingDuePaid || 0),
@@ -43,6 +32,36 @@ const getDashboardStats = async (req, res) => {
         },
       },
     ]);
+
+    const customerOrderBalances = await Order.aggregate([
+      { $match: { createdBy: userId } },
+      {
+        $group: {
+          _id: "$customer",
+          balance: {
+            $sum: {
+              $subtract: ["$subTotal", "$paidAmount"],
+            },
+          },
+        },
+      },
+    ]);
+
+    const orderBalanceByCustomer = new Map(
+      customerOrderBalances.map((entry) => [
+        entry._id.toString(),
+        Number(entry.balance || 0),
+      ])
+    );
+
+    const ledgerDueBalance = customers.reduce((sum, customer) => {
+      const openingBalance =
+        Number(customer.openingDue || 0) - Number(customer.openingDuePaid || 0);
+      const orderBalance = orderBalanceByCustomer.get(customer._id.toString()) || 0;
+      const runningBalance = openingBalance + orderBalance;
+
+      return sum + Math.max(runningBalance, 0);
+    }, 0);
 
     const lowStockProducts = await Product.find({
       createdBy: userId,
@@ -67,7 +86,7 @@ const getDashboardStats = async (req, res) => {
       totalOrders,
       totalSales: stats.totalSales,
       totalPaid: Number(stats.totalPaid || 0) + openingDuePaid,
-      totalDueAmount: Number(stats.totalDue || 0) + openingDueBalance,
+      totalDueAmount: ledgerDueBalance,
       lowStockCount: lowStockProducts.length,
       lowStockProducts,
     });

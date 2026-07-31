@@ -4,7 +4,7 @@ import API from "../api/axios";
 import AppLayout from "../components/AppLayout";
 import LoadingState from "../components/LoadingState";
 import PaymentFormModal from "../components/PaymentFormModal";
-import { initialPaymentForm } from "../constants/forms";
+import { getTodayInputDate, initialPaymentForm } from "../constants/forms";
 import getBillNumber from "../utils/billNumber";
 
 const Payments = () => {
@@ -97,7 +97,10 @@ const Payments = () => {
   }, [payments, search]);
 
   const resetForm = () => {
-    setForm(initialPaymentForm);
+    setForm({
+      ...initialPaymentForm,
+      paymentDate: getTodayInputDate(),
+    });
   };
 
   const openPaymentModal = (order = null) => {
@@ -105,9 +108,14 @@ const Payments = () => {
       setForm({
         ...initialPaymentForm,
         orderId: order._id,
+        amount: String(order.dueAmount || ""),
+        paymentDate: getTodayInputDate(),
       });
     } else {
-      resetForm();
+      setForm({
+        ...initialPaymentForm,
+        paymentDate: getTodayInputDate(),
+      });
     }
 
     setIsModalOpen(true);
@@ -145,7 +153,7 @@ const Payments = () => {
       orderId: form.orderId,
       amount,
       paymentMode: form.paymentMode,
-      paymentDate: form.paymentDate || new Date(),
+      paymentDate: form.paymentDate || getTodayInputDate(),
       notes: form.notes,
     };
 
@@ -184,7 +192,7 @@ const Payments = () => {
       label: "Cash Received",
       value: `₹${stats.cashPaid}`,
       icon: Wallet,
-      color: "text-blue-600",
+      color: "text-slate-700",
     },
     {
       label: "UPI Received",

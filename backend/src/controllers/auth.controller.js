@@ -9,6 +9,16 @@ const generateToken = (userId) => {
   });
 };
 
+const serializeUser = (user) => ({
+  id: user._id,
+  name: user.name,
+  email: user.email,
+  shopName: user.shopName || "",
+  shopPhone: user.shopPhone || "",
+  shopAddress: user.shopAddress || "",
+  logoUrl: user.logoUrl || "",
+});
+
 const signup = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -46,11 +56,7 @@ const signup = async (req, res) => {
     return res.status(201).json({
       message: "Signup successful",
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-      },
+      user: serializeUser(user),
     });
   } catch (error) {
     console.log("Signup error:", error);
@@ -94,11 +100,7 @@ const signin = async (req, res) => {
     return res.json({
       message: "Signin successful",
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-      },
+      user: serializeUser(user),
     });
   } catch (error) {
     console.log("Signin error:", error);
@@ -111,8 +113,102 @@ const signin = async (req, res) => {
 
 const me = async (req, res) => {
   return res.json({
-    user: req.user,
+    user: serializeUser(req.user),
   });
+};
+
+const updateProfile = async (req, res) => {
+  try {
+    const {
+      name,
+      email,
+      shopName = "",
+      shopPhone = "",
+      shopAddress = "",
+      logoUrl = "",
+    } = req.body;
+
+    if (!name || !email) {
+      return res.status(400).json({
+        message: "Owner name and email are required",
+      });
+    }
+
+    const existingUser = await User.findOne({
+      _id: { $ne: req.user._id },
+      email: email.toLowerCase(),
+    });
+
+    if (existingUser) {
+      return res.status(400).json({
+        message: "Email already registered",
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        name,
+        email: email.toLowerCase(),
+        shopName,
+        shopPhone,
+        shopAddress,
+        logoUrl,
+      },
+      { new: true, runValidators: true }
+    );
+
+    return res.json({
+      message: "Profile updated",
+      user: serializeUser(user),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Profile update failed",
+      error: error.message,
+    });
+  }
+};
+
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        message: "Current password and new password are required",
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        message: "Password must be at least 6 characters",
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+    const isPasswordMatch = await bcrypt.compare(currentPassword, user.password);
+
+    if (!isPasswordMatch) {
+      return res.status(401).json({
+        message: "Current password is incorrect",
+      });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await user.save();
+
+    return res.json({
+      message: "Password changed successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Password change failed",
+      error: error.message,
+    });
+  }
 };
 
 const forgotPassword = async (req, res) => {
@@ -206,6 +302,8 @@ module.exports = {
   signup,
   signin,
   me,
+  updateProfile,
+  changePassword,
   forgotPassword,
   resetPassword,
 };

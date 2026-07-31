@@ -10,6 +10,7 @@ import {
 import API from "../api/axios";
 import AppLayout from "../components/AppLayout";
 import LoadingState from "../components/LoadingState";
+import { getTodayInputDate } from "../constants/forms";
 
 const CustomerDetail = () => {
   const { id } = useParams();
@@ -25,7 +26,7 @@ const CustomerDetail = () => {
   const [collectForm, setCollectForm] = useState({
     amount: "",
     paymentMode: "cash",
-    paymentDate: "",
+    paymentDate: getTodayInputDate(),
     notes: "",
   });
   const [collectLoading, setCollectLoading] = useState(false);
@@ -63,8 +64,8 @@ const CustomerDetail = () => {
       0
     );
 
-     const totalDue = Number(summary?.totalDue || 0);
-     const totalAdvance = Number(summary?.totalAdvance || 0);
+    const totalDue = Number(summary?.totalDue || 0);
+    const totalAdvance = Number(summary?.totalAdvance || 0);
 
     const totalPaymentHistory = payments.reduce(
       (sum, payment) => sum + Number(payment.amount || 0),
@@ -72,57 +73,84 @@ const CustomerDetail = () => {
     );
 
     return {
-     totalOrders: orders.length,
-    totalSales,
-    totalPaid,
-    totalDue,
-    totalAdvance,
-    totalPaymentHistory
+      totalOrders: orders.length,
+      totalSales,
+      totalPaid,
+      totalDue,
+      totalAdvance,
+      totalPaymentHistory,
     };
   }, [orders, payments, summary]);
 
   const handleCollectPayment = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  try {
-    const amount = Number(collectForm.amount);
-    const totalDue = Number(stats.totalDue || 0);
+    try {
+      const amount = Number(collectForm.amount);
+      const totalDue = Number(stats.totalDue || 0);
 
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setMessage("Payment amount must be greater than 0");
-      return;
-    }
+      if (!Number.isFinite(amount) || amount <= 0) {
+        setMessage("Payment amount must be greater than 0");
+        return;
+      }
 
-    if (amount > totalDue) {
-      setMessage("Payment cannot be greater than total due");
-      return;
-    }
+      if (amount > totalDue) {
+        setMessage("Payment cannot be greater than total due");
+        return;
+      }
 
-    setCollectLoading(true);
-    setMessage("");
+      setCollectLoading(true);
+      setMessage("");
 
-    await API.post(`/payments/customer/${id}/collect`, {
-      amount,
-      paymentMode: collectForm.paymentMode,
-      paymentDate: collectForm.paymentDate || new Date(),
-      notes: collectForm.notes,
-    });
+      await API.post(`/payments/customer/${id}/collect`, {
+        amount,
+        paymentMode: collectForm.paymentMode,
+      paymentDate: collectForm.paymentDate || getTodayInputDate(),
+        notes: collectForm.notes,
+      });
 
-    setCollectForm({
+      setCollectForm({
       amount: "",
       paymentMode: "cash",
-      paymentDate: "",
+      paymentDate: getTodayInputDate(),
       notes: "",
     });
 
-    setCollectOpen(false);
-    fetchCustomerDetail();
-  } catch (error) {
-    setMessage(error.response?.data?.message || "Payment collection failed");
-  } finally {
-    setCollectLoading(false);
-  }
-};
+      setCollectOpen(false);
+      fetchCustomerDetail();
+    } catch (error) {
+      setMessage(error.response?.data?.message || "Payment collection failed");
+    } finally {
+      setCollectLoading(false);
+    }
+  };
+
+  const getOrderPaymentType = (order) => {
+    const paidNow = Number(order.ledger?.paidNow ?? order.paidAmount ?? 0);
+    const totalPayable = Number(order.ledger?.totalPayable ?? order.subTotal ?? 0);
+
+    if (paidNow <= 0) return "No Payment";
+    if (paidNow >= totalPayable) return "Full Payment";
+    return "Partial Payment";
+  };
+
+  const getOrderPaymentTypeClass = (order) => {
+    const type = getOrderPaymentType(order);
+
+    if (type === "Full Payment") return "bg-green-50 text-green-700";
+    if (type === "Partial Payment") return "bg-yellow-50 text-yellow-700";
+    return "bg-red-50 text-red-700";
+  };
+
+  const openCollectPayment = () => {
+    setCollectForm({
+      amount: stats.totalDue ? String(stats.totalDue) : "",
+      paymentMode: "cash",
+      paymentDate: getTodayInputDate(),
+      notes: "",
+    });
+    setCollectOpen(true);
+  };
 
   return (
     <AppLayout
@@ -131,7 +159,7 @@ const CustomerDetail = () => {
     >
       <button
         onClick={() => navigate("/customers")}
-        className="mb-5 flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-blue-600"
+        className="mb-5 flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-amber-700"
       >
         <ArrowLeft size={18} />
         Back to Customers
@@ -155,7 +183,7 @@ const CustomerDetail = () => {
 
               <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
                 <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-4">
-                  <Phone className="text-blue-600" size={20} />
+                  <Phone className="text-amber-700" size={20} />
                   <div>
                     <p className="text-xs text-slate-500">Phone</p>
                     <p className="font-bold text-slate-900">
@@ -186,7 +214,7 @@ const CustomerDetail = () => {
                 </h3>
 
                 <button
-                  onClick={() => setCollectOpen(true)}
+                  onClick={openCollectPayment}
                   className="mt-4 rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700"
                 >
                   Collect Payment
@@ -268,15 +296,9 @@ const CustomerDetail = () => {
                     </div>
 
                     <span
-                      className={`h-fit rounded-full px-3 py-1 text-xs font-bold capitalize ${
-                        order.paymentStatus === "paid"
-                          ? "bg-green-50 text-green-700"
-                          : order.paymentStatus === "partial"
-                          ? "bg-yellow-50 text-yellow-700"
-                          : "bg-red-50 text-red-700"
-                      }`}
+                      className={`h-fit rounded-full px-3 py-1 text-xs font-bold ${getOrderPaymentTypeClass(order)}`}
                     >
-                      {order.paymentStatus}
+                      {getOrderPaymentType(order)}
                     </span>
                   </div>
 
@@ -298,7 +320,16 @@ const CustomerDetail = () => {
                   </div>
 
                   {order.ledger && (
-                    <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-5">
+                    <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-6">
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500">
+                          Payment Type
+                        </p>
+                        <p className="mt-1 font-bold text-slate-900">
+                          {getOrderPaymentType(order)}
+                        </p>
+                      </div>
+
                       <div>
                         <p className="text-xs font-semibold text-slate-500">
                           Previous Due
@@ -321,7 +352,7 @@ const CustomerDetail = () => {
                         <p className="text-xs font-semibold text-slate-500">
                           Total Payable
                         </p>
-                        <p className="mt-1 font-bold text-blue-700">
+                        <p className="mt-1 font-bold text-amber-700">
                           ₹{order.ledger.totalPayable}
                         </p>
                       </div>
@@ -357,7 +388,7 @@ const CustomerDetail = () => {
                       </div>
                     </div>
                   )}
-                  {order.ledger.previousAdvance > 0 && (
+                  {order.ledger?.previousAdvance > 0 && (
                     <div>
                         <p className="text-xs font-semibold text-slate-500">
                         Previous Advance

@@ -107,47 +107,71 @@ const createOrder = async (req, res) => {
     let itemsTotal = 0;
 
     for (const item of items) {
-      const product = await Product.findOne({
-        _id: item.productId,
-        createdBy: req.user._id,
-        isActive: true,
-      });
+      const source = item.source === "outsourced" ? "outsourced" : "shop_stock";
+      let product = null;
 
-      if (!product) {
-        return res.status(404).json({
-          message: `Product not found: ${item.productId}`,
+      if (item.productId) {
+        product = await Product.findOne({
+          _id: item.productId,
+          createdBy: req.user._id,
+          isActive: true,
+        });
+
+        if (!product) {
+          return res.status(404).json({
+            message: `Product not found: ${item.productId}`,
+          });
+        }
+      }
+
+      if (source === "shop_stock" && !product) {
+        return res.status(400).json({
+          message: "Godown stock item must be selected from product list",
         });
       }
 
+      const productName = product?.name || String(item.productName || "").trim();
       const quantity = Number(item.quantity);
       const pricePerUnit =
         item.pricePerUnit !== undefined
           ? Number(item.pricePerUnit)
-          : Number(product.pricePerUnit);
+          : Number(product?.pricePerUnit || 0);
       const conversionToBase = Number(item.conversionToBase || 1);
-      const selectedUnit = item.selectedUnit || product.unit;
+      const selectedUnit = item.selectedUnit || product?.unit || item.unit;
+
+      if (!productName) {
+        return res.status(400).json({
+          message: "Outsource item name is required",
+        });
+      }
+
+      if (!selectedUnit) {
+        return res.status(400).json({
+          message: `Unit is required for ${productName}`,
+        });
+      }
 
       if (!isFiniteNumber(quantity) || quantity <= 0) {
         return res.status(400).json({
-          message: `Invalid quantity for ${product.name}`,
+          message: `Invalid quantity for ${productName}`,
         });
       }
 
       if (!isFiniteNumber(pricePerUnit) || pricePerUnit < 0) {
         return res.status(400).json({
-          message: `Invalid price for ${product.name}`,
+          message: `Invalid price for ${productName}`,
         });
       }
 
       if (!isFiniteNumber(conversionToBase) || conversionToBase <= 0) {
         return res.status(400).json({
-          message: `Invalid unit conversion for ${product.name}`,
+          message: `Invalid unit conversion for ${productName}`,
         });
       }
 
       const stockDeduct = quantity * conversionToBase;
 
-      if (stockDeduct > product.currentStock) {
+      if (source === "shop_stock" && stockDeduct > product.currentStock) {
         return res.status(400).json({
           message: `${product.name} stock not enough. Available: ${product.currentStock} ${product.unit}`,
         });
@@ -157,8 +181,8 @@ const createOrder = async (req, res) => {
       itemsTotal += total;
 
       orderItems.push({
-        product: product._id,
-        productName: product.name,
+        product: product ? product._id : null,
+        productName,
         unit: selectedUnit,
         selectedUnit,
         quantity,
@@ -166,14 +190,17 @@ const createOrder = async (req, res) => {
         baseQuantity: stockDeduct,
         pricePerUnit,
         total,
+        source,
       });
 
-      stockUpdates.push({
-        product,
-        quantity: stockDeduct,
-        previousStock: product.currentStock,
-        newStock: product.currentStock - stockDeduct,
-      });
+      if (source === "shop_stock") {
+        stockUpdates.push({
+          product,
+          quantity: stockDeduct,
+          previousStock: product.currentStock,
+          newStock: product.currentStock - stockDeduct,
+        });
+      }
     }
 
     const finalDeliveryCharge = Number(deliveryCharge || 0);
@@ -190,12 +217,6 @@ const createOrder = async (req, res) => {
     if (!isFiniteNumber(finalPaidAmount) || finalPaidAmount < 0) {
       return res.status(400).json({
         message: "Paid amount cannot be negative",
-      });
-    }
-
-    if (finalPaidAmount > subTotal) {
-      return res.status(400).json({
-        message: "Paid amount cannot be greater than bill total",
       });
     }
 

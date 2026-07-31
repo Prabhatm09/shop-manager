@@ -8,6 +8,10 @@ import getBillNumber from "../utils/billNumber";
 const Invoice = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const storedUser = JSON.parse(localStorage.getItem("shop_user") || "{}");
+  const shopName = storedUser?.shopName || "RM Trader";
+  const shopPhone = storedUser?.shopPhone || "";
+  const shopAddress = storedUser?.shopAddress || "Lucknow, Uttar Pradesh";
 
   const [order, setOrder] = useState(null);
   const [message, setMessage] = useState("");
@@ -22,7 +26,30 @@ const Invoice = () => {
   const fetchOrder = useCallback(async () => {
     try {
       const res = await API.get(`/orders/${id}`);
-      setOrder(res.data.order);
+      const loadedOrder = res.data.order;
+      const customerId =
+        typeof loadedOrder.customer === "object"
+          ? loadedOrder.customer?._id
+          : loadedOrder.customer;
+
+      if (!customerId) {
+        setOrder(loadedOrder);
+        return;
+      }
+
+      try {
+        const customerRes = await API.get(`/customers/${customerId}`);
+        const ledgerOrder = (customerRes.data.orders || []).find(
+          (entry) => entry._id === loadedOrder._id
+        );
+
+        setOrder({
+          ...loadedOrder,
+          ledger: ledgerOrder?.ledger || null,
+        });
+      } catch {
+        setOrder(loadedOrder);
+      }
     } catch (error) {
       setMessage(error.response?.data?.message || "Failed to load invoice");
     }
@@ -71,6 +98,61 @@ const Invoice = () => {
   const getReturnEntries = (billOrder) =>
     (billOrder?.adjustments || []).filter((entry) => entry.type === "return");
 
+  const getReturnSummary = (billOrder) => {
+    const returns = getReturnEntries(billOrder);
+
+    return returns.reduce(
+      (summary, entry) => {
+        const gross =
+          Number(entry.quantity || 0) * Number(entry.returnRate || 0);
+        const labour = Number(entry.labourCharge || 0);
+        const credit = Number(entry.amount || 0);
+
+        return {
+          gross: summary.gross + gross,
+          labour: summary.labour + labour,
+          credit: summary.credit + credit,
+        };
+      },
+      { gross: 0, labour: 0, credit: 0 }
+    );
+  };
+
+  const getLedgerSummary = (billOrder) => {
+    const ledger = billOrder?.ledger || {};
+    const previousDue = Number(ledger.previousDue || 0);
+    const previousAdvance = Number(ledger.previousAdvance || 0);
+    const thisBill = Number(ledger.newBill ?? billOrder?.subTotal ?? 0);
+    const paidNow = Number(ledger.paidNow ?? billOrder?.paidAmount ?? 0);
+    const totalPayable = Number(
+      ledger.totalPayable ?? Math.max(thisBill + previousDue - previousAdvance, 0)
+    );
+    const balanceAfterOrder = Number(
+      ledger.balanceAfterOrder ??
+        previousDue +
+          thisBill -
+          previousAdvance -
+          paidNow
+    );
+    const currentDue = Number(
+      ledger.dueAfterOrder ?? Math.max(balanceAfterOrder, 0)
+    );
+    const currentAdvance = Number(
+      ledger.advanceAfterOrder ?? Math.max(Math.abs(balanceAfterOrder), 0)
+    );
+
+    return {
+      previousDue,
+      previousAdvance,
+      thisBill,
+      paidNow,
+      totalPayable,
+      currentDue,
+      currentAdvance: balanceAfterOrder < 0 ? currentAdvance : 0,
+      hasLedgerContext: previousDue > 0 || previousAdvance > 0,
+    };
+  };
+
   const getBillValidationError = (billOrder) => {
     if (!billOrder) return "Order is not ready";
     if (!billOrder.customerName?.trim()) {
@@ -118,13 +200,27 @@ const Invoice = () => {
     );
     const billTotal = Number(billOrder.subTotal);
     const paidAmount = Number(billOrder.paidAmount || 0);
-    const dueAmount = Number(billOrder.dueAmount || 0);
+    const billDueAmount = Number(billOrder.dueAmount || 0);
+    const ledgerSummary = getLedgerSummary(billOrder);
+    const dueAmount = ledgerSummary.hasLedgerContext
+      ? ledgerSummary.currentDue
+      : billDueAmount;
 
-    if (![deliveryCharge, lateCharge, billTotal, paidAmount, dueAmount].every(Number.isFinite)) {
+    if (
+      ![
+        deliveryCharge,
+        lateCharge,
+        billTotal,
+        paidAmount,
+        billDueAmount,
+        dueAmount,
+        ledgerSummary.totalPayable,
+      ].every(Number.isFinite)
+    ) {
       return "Bill totals are not valid";
     }
     if (deliveryCharge < 0 || lateCharge < 0) {
-      return "Extra charges cannot be negative";
+      return "Labour charges cannot be negative";
     }
     if (
       !isSameAmount(
@@ -137,7 +233,12 @@ const Invoice = () => {
     if (paidAmount < 0) {
       return "Paid amount is not valid for this bill";
     }
-    if (!isSameAmount(dueAmount, Math.max(billTotal - paidAmount, 0))) {
+
+    const expectedDue = ledgerSummary.hasLedgerContext
+      ? Math.max(ledgerSummary.totalPayable - paidAmount, 0)
+      : Math.max(billTotal - paidAmount, 0);
+
+    if (!isSameAmount(dueAmount, expectedDue)) {
       return "Due amount does not match bill total and paid amount";
     }
 
@@ -179,11 +280,23 @@ const Invoice = () => {
     const itemTotal = items.reduce((sum, item) => sum + Number(item.total || 0), 0);
     const deliveryCharge = Number(billOrder.deliveryCharge || 0);
     const lateCharge = Number(billOrder.lateCharge || 0);
+    const ledgerSummary = getLedgerSummary(billOrder);
     const returns = getReturnEntries(billOrder);
-    const visibleRows = Math.max(items.length, 10);
+    const returnSummary = getReturnSummary(billOrder);
+    const visibleRows = Math.max(items.length + (returns.length ? 0 : 2), 1);
     const width = 620;
     const rowHeight = 44;
-    const tableTop = 260;
+    const billNo = getBillNumber(billOrder);
+    const date = new Date(billOrder.createdAt || Date.now()).toLocaleDateString("en-IN");
+    const address = billOrder.deliveryAddress || billOrder.customer?.address || "-";
+    const customerNameLines = wrapText(billOrder.customerName || "-", 34).slice(0, 2);
+    const customerAddressLines = wrapText(
+      `${billOrder.customerPhone || "-"} | ${address}`,
+      64
+    ).slice(0, 2);
+    const customerStartY = 232;
+    const customerAddressY = customerStartY + customerNameLines.length * 20 + 8;
+    const tableTop = customerAddressY + customerAddressLines.length * 16 + 34;
     const tableHeight = 44 + visibleRows * rowHeight;
     const returnsTop = tableTop + tableHeight + 38;
     const returnRowHeight = 34;
@@ -191,12 +304,78 @@ const Invoice = () => {
     const totalsTop = returns.length
       ? returnsTop + returnsHeight + 24
       : tableTop + tableHeight + 24;
-    const billNo = getBillNumber(billOrder);
-    const date = new Date(billOrder.createdAt || Date.now()).toLocaleDateString("en-IN");
-    const address = billOrder.deliveryAddress || billOrder.customer?.address || "-";
-    const baseOffset =
-      (deliveryCharge > 0 ? 30 : 0) + (lateCharge > 0 ? 30 : 0);
-    const totalLineY = totalsTop + 40 + baseOffset + 12;
+    const showPreviousAdvance = ledgerSummary.previousAdvance > 0;
+    const summaryRows = [
+      {
+        label: "Material Given",
+        amount: itemTotal,
+        color: "#101827",
+        strong: false,
+      },
+      ...(returnSummary.gross > 0
+        ? [
+            {
+              label: "Material Returned",
+              amount: -returnSummary.gross,
+              color: "#0b6b3a",
+              strong: false,
+            },
+            {
+              label: "Return Labour",
+              amount: returnSummary.labour,
+              color: "#b45309",
+              strong: false,
+            },
+            {
+              label: "Return Credit",
+              amount: -returnSummary.credit,
+              color: "#0b6b3a",
+              strong: true,
+            },
+          ]
+        : []),
+      ...(deliveryCharge > 0
+        ? [
+            {
+              label: "Labour Charge",
+              amount: deliveryCharge,
+              color: "#101827",
+              strong: false,
+            },
+          ]
+        : []),
+      ...(lateCharge > 0
+        ? [
+            {
+              label: "Late Charge",
+              amount: lateCharge,
+              color: "#101827",
+              strong: false,
+            },
+          ]
+        : []),
+      ...(ledgerSummary.hasLedgerContext
+        ? [
+            {
+              label: "Previous Due",
+              amount: ledgerSummary.previousDue,
+              color: "#b45309",
+              strong: false,
+            },
+            ...(showPreviousAdvance
+              ? [
+                  {
+                    label: "Previous Advance",
+                    amount: -ledgerSummary.previousAdvance,
+                    color: "#0b6b3a",
+                    strong: false,
+                  },
+                ]
+              : []),
+          ]
+        : []),
+    ];
+    const totalLineY = totalsTop + 30 * summaryRows.length + 12;
     const billTotalY = totalLineY + 30;
     const paidY = billTotalY + 30;
     const dueY = paidY + 30;
@@ -212,12 +391,12 @@ const Invoice = () => {
         const itemText = itemLines
           .map(
             (line, lineIndex) =>
-              `<text x="112" y="${y + 26 + lineIndex * 14}" class="cell strong">${escapeXml(line)}</text>`
+              `<text x="112" y="${y + 26 + lineIndex * 14}" class="cell item-name">${escapeXml(line)}</text>`
           )
           .join("");
 
         return `
-          <text x="62" y="${y + 27}" text-anchor="middle" class="cell">${index + 1}</text>
+          <text x="74" y="${y + 27}" text-anchor="middle" class="cell serial">${index + 1}</text>
           ${itemText}
           <text x="386" y="${y + 27}" text-anchor="end" class="cell">${formatMoney(item.pricePerUnit).replace("Rs. ", "")}</text>
           <text x="446" y="${y + 27}" text-anchor="middle" class="cell">${escapeXml(item.quantity)} ${escapeXml(item.selectedUnit || item.unit)}</text>
@@ -231,14 +410,22 @@ const Invoice = () => {
 
     const tableLines = Array.from({ length: visibleRows + 1 }, (_, index) => {
       const y = tableTop + 44 + index * rowHeight;
-      return `<line x1="36" y1="${y}" x2="584" y2="${y}" class="grid"/>`;
+      return `<line x1="52" y1="${y}" x2="568" y2="${y}" class="grid"/>`;
     }).join("");
 
-    const dueAmount = Number(billOrder.dueAmount || 0);
+    const dueAmount = ledgerSummary.hasLedgerContext
+      ? ledgerSummary.currentDue
+      : Number(billOrder.dueAmount || 0);
+    const totalBillAmount = ledgerSummary.hasLedgerContext
+      ? ledgerSummary.totalPayable
+      : Number(billOrder.subTotal || 0);
     const refundAmount = Math.max(
-      Number(billOrder.paidAmount || 0) - Number(billOrder.subTotal || 0),
+      Number(billOrder.paidAmount || 0) - totalBillAmount,
       0
     );
+    const advanceAmount = ledgerSummary.hasLedgerContext
+      ? ledgerSummary.currentAdvance
+      : 0;
     const dueColor = dueAmount > 0 ? "#b42318" : "#0b6b3a";
     const returnRows = returns
       .map((entry, index) => {
@@ -248,7 +435,7 @@ const Invoice = () => {
 
         return `
           <text x="52" y="${y + 22}" class="small">${escapeXml(returnDate)}</text>
-          <text x="144" y="${y + 22}" class="cell strong">${escapeXml(entry.productName || "Return")}</text>
+          <text x="144" y="${y + 22}" class="cell item-name">${escapeXml(entry.productName || "Return")}</text>
           <text x="326" y="${y + 22}" text-anchor="end" class="cell">${formatMoney(entry.returnRate || 0).replace("Rs. ", "")}</text>
           <text x="390" y="${y + 22}" text-anchor="middle" class="cell">${escapeXml(entry.quantity || "")} ${escapeXml(entry.unit || "")}</text>
           <text x="474" y="${y + 22}" text-anchor="end" class="cell">${formatMoney(entry.labourCharge || 0).replace("Rs. ", "")}</text>
@@ -260,56 +447,120 @@ const Invoice = () => {
     const returnLines = returns.length
       ? Array.from({ length: returns.length + 1 }, (_, index) => {
         const y = returnsTop + 40 + index * returnRowHeight;
-        return `<line x1="36" y1="${y}" x2="584" y2="${y}" class="grid"/>`;
+        return `<line x1="52" y1="${y}" x2="568" y2="${y}" class="grid"/>`;
       }).join("")
       : "";
 
+    const customerNameText = customerNameLines
+      .map(
+        (line, index) =>
+          `<text x="82" y="${customerStartY + index * 20}" class="body">${escapeXml(line)}</text>`
+      )
+      .join("");
+    const customerAddressText = customerAddressLines
+      .map(
+        (line, index) =>
+          `<text x="52" y="${customerAddressY + index * 16}" class="small">${escapeXml(line)}</text>`
+      )
+      .join("");
+
+    const summaryTextRows = summaryRows
+      .map((row, index) => {
+        const y = totalsTop + index * 30;
+        const amount = row.amount < 0 ? `-${formatMoney(Math.abs(row.amount))}` : formatMoney(row.amount);
+        const className = row.strong ? "body strong" : "body";
+
+        return `
+          <text x="342" y="${y}" class="${className}" style="fill:${row.color}">${row.label}</text>
+          <text x="560" y="${y}" text-anchor="end" class="${className}" style="fill:${row.color}">${amount}</text>
+        `;
+      })
+      .join("");
+
     return `
       <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+        <defs>
+          <filter id="paperNoise" x="0" y="0" width="100%" height="100%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" seed="12" result="noise"/>
+            <feColorMatrix type="saturate" values="0"/>
+            <feComponentTransfer>
+              <feFuncA type="table" tableValues="0 0.045"/>
+            </feComponentTransfer>
+          </filter>
+          <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#1f2937" flood-opacity="0.13"/>
+          </filter>
+          <pattern id="ruled" width="12" height="12" patternUnits="userSpaceOnUse">
+            <path d="M0 11.5 H12" stroke="#eef0e8" stroke-width="0.7"/>
+          </pattern>
+        </defs>
         <style>
-          .shop { font: 900 34px Arial, sans-serif; fill: #101827; letter-spacing: 0.4px; }
-          .estimate { font: 800 15px Arial, sans-serif; fill: #fffdf7; letter-spacing: 1.8px; }
-          .label { font: 800 14px Arial, sans-serif; fill: #667085; letter-spacing: 0.9px; }
-          .body { font: 700 17px Arial, sans-serif; fill: #101827; }
-          .small { font: 600 13px Arial, sans-serif; fill: #667085; }
-          .cell { font: 700 15px Arial, sans-serif; fill: #202a33; }
-          .head { font: 800 13px Arial, sans-serif; fill: #334155; letter-spacing: 1px; }
-          .strong { font-weight: 800; fill: #101827; }
+          .shop { font: 900 27px Arial, sans-serif; fill: #1f3768; letter-spacing: 0.1px; }
+          .estimate { font: 900 13px Arial, sans-serif; fill: #f7faf5; letter-spacing: 1.8px; }
+          .label { font: 900 12.5px Arial, sans-serif; fill: #2b4778; letter-spacing: 1.2px; }
+          .body { font: 700 15.2px Arial, sans-serif; fill: #27364f; }
+          .small { font: 650 12.2px Arial, sans-serif; fill: #526176; }
+          .tiny { font: 700 9.5px Arial, sans-serif; fill: #6f7d91; letter-spacing: 0.55px; }
+          .cell { font: 700 13.6px Arial, sans-serif; fill: #253247; }
+          .item-name { font-weight: 900; fill: #182235; }
+          .serial { fill: #4d5b70; }
+          .head { font: 800 11px Arial, sans-serif; fill: #334155; letter-spacing: 0.9px; }
+          .strong { font-weight: 900; fill: #142034; }
           .muted { fill: #667085; }
-          .grid { stroke: #8993a0; stroke-width: 1; }
-          .paper-edge { stroke: #ded6c6; stroke-width: 1.2; }
+          .grid { stroke: #536070; stroke-width: 0.75; opacity: 0.78; }
+          .paper-edge { stroke: #d8dfdc; stroke-width: 1; }
+          .side-brand { font: 900 20px Arial, sans-serif; fill: #244574; letter-spacing: 1.2px; }
+          .side-small { font: 700 12px Arial, sans-serif; fill: #6a7690; }
+          .logo-dot { fill: #294778; opacity: 0.94; }
         </style>
 
-        <rect width="${width}" height="${height}" fill="#eee8d9"/>
-        <path d="M30 20 H590 V${height - 28} Q590 ${height - 12} 574 ${height - 12} H46 Q30 ${height - 12} 30 ${height - 28} Z" fill="#fffef8" class="paper-edge"/>
-        <path d="M30 20 C42 28 50 12 62 20 C74 28 82 12 94 20 C106 28 114 12 126 20 C138 28 146 12 158 20 C170 28 178 12 190 20 C202 28 210 12 222 20 C234 28 242 12 254 20 C266 28 274 12 286 20 C298 28 306 12 318 20 C330 28 338 12 350 20 C362 28 370 12 382 20 C394 28 402 12 414 20 C426 28 434 12 446 20 C458 28 466 12 478 20 C490 28 498 12 510 20 C522 28 530 12 542 20 C554 28 562 12 574 20 C584 26 590 20 590 20" fill="#eee8d9"/>
+        <rect width="${width}" height="${height}" fill="#e9eef4"/>
+        <path d="M28 18 H592 V${height - 26} Q592 ${height - 10} 576 ${height - 10} H44 Q28 ${height - 10} 28 ${height - 26} Z" fill="#eef4f0" filter="url(#softShadow)" opacity="0.6"/>
+        <path d="M38 20 H582 V${height - 32} Q582 ${height - 20} 570 ${height - 20} H50 Q38 ${height - 20} 38 ${height - 32} Z" fill="#fbfdf7" class="paper-edge"/>
+        <path d="M38 20 C50 25 56 15 68 20 C80 25 86 15 98 20 C110 25 116 15 128 20 C140 25 146 15 158 20 C170 25 176 15 188 20 C200 25 206 15 218 20 C230 25 236 15 248 20 C260 25 266 15 278 20 C290 25 296 15 308 20 C320 25 326 15 338 20 C350 25 356 15 368 20 C380 25 386 15 398 20 C410 25 416 15 428 20 C440 25 446 15 458 20 C470 25 476 15 488 20 C500 25 506 15 518 20 C530 25 536 15 548 20 C560 25 570 20 582 20" fill="#e9eef4"/>
+        <rect x="38" y="24" width="544" height="${height - 58}" fill="url(#ruled)" opacity="0.25"/>
+        <rect x="38" y="24" width="544" height="${height - 58}" filter="url(#paperNoise)"/>
 
-        <rect x="250" y="48" width="120" height="32" rx="4" fill="#26406d"/>
+        <g transform="translate(54 52)">
+          <rect x="0" y="0" width="12" height="12" rx="3" class="logo-dot"/>
+          <rect x="16" y="0" width="12" height="12" rx="3" class="logo-dot"/>
+          <rect x="32" y="0" width="12" height="12" rx="3" class="logo-dot"/>
+          <rect x="0" y="16" width="12" height="12" rx="3" class="logo-dot"/>
+          <rect x="16" y="16" width="12" height="12" rx="3" class="logo-dot"/>
+          <rect x="32" y="16" width="12" height="12" rx="3" class="logo-dot"/>
+        </g>
+        <text x="76" y="${height - 176}" class="side-brand" transform="rotate(-90 76 ${height - 176})">${escapeXml(shopName).slice(0, 22)}</text>
+        <text x="88" y="${height - 176}" class="side-small" transform="rotate(-90 88 ${height - 176})">estimate copy</text>
+
+        <rect x="250" y="56" width="120" height="30" rx="2" fill="#244574"/>
         <text x="310" y="70" text-anchor="middle" class="estimate">ESTIMATE</text>
 
-        <text x="310" y="114" text-anchor="middle" class="shop">RM Trader</text>
-        <text x="310" y="138" text-anchor="middle" class="small">Building Material Supplier</text>
-        <text x="310" y="158" text-anchor="middle" class="small">Lucknow, Uttar Pradesh</text>
+        <text x="310" y="120" text-anchor="middle" class="shop">${escapeXml(shopName)}</text>
+        <text x="310" y="143" text-anchor="middle" class="small">Building Material Supplier</text>
+        <text x="310" y="162" text-anchor="middle" class="small">${escapeXml(shopPhone ? `${shopAddress} | ${shopPhone}` : shopAddress).slice(0, 72)}</text>
+        <line x1="118" y1="184" x2="568" y2="184" stroke="#a7b1bb" stroke-dasharray="5 7"/>
 
-        <text x="40" y="188" class="small">Bill No: ${billNo}</text>
-        <text x="580" y="188" text-anchor="end" class="body">Date: ${date}</text>
+        <text x="52" y="208" class="small">Bill No: </text>
+        <text x="104" y="208" class="body strong">${billNo}</text>
+        <text x="568" y="208" text-anchor="end" class="body strong">Date: ${date}</text>
 
-        <text x="40" y="224" class="small">To,</text>
-        <line x1="75" y1="221" x2="580" y2="221" stroke="#667085" stroke-dasharray="6 6"/>
-        <text x="116" y="214" class="body">${escapeXml(billOrder.customerName)}</text>
-        <text x="40" y="246" class="small">${escapeXml(billOrder.customerPhone)} | ${escapeXml(address).slice(0, 54)}</text>
+        <text x="52" y="${customerStartY}" class="small">To,</text>
+        <line x1="82" y1="${customerStartY + 5}" x2="568" y2="${customerStartY + 5}" stroke="#8f98a6" stroke-dasharray="7 6"/>
+        ${customerNameText}
+        ${customerAddressText}
 
-        <text x="36" y="${tableTop - 12}" class="label">ITEMS PURCHASED</text>
-        <rect x="36" y="${tableTop}" width="548" height="${tableHeight}" fill="#fffef8" stroke="#202a33" stroke-width="1.2"/>
-        <line x1="86" y1="${tableTop}" x2="86" y2="${tableTop + tableHeight}" class="grid"/>
-        <line x1="316" y1="${tableTop}" x2="316" y2="${tableTop + tableHeight}" class="grid"/>
+        <text x="52" y="${tableTop - 12}" class="label">MATERIAL GIVEN</text>
+        <rect x="52" y="${tableTop}" width="516" height="${tableHeight}" fill="#fffef8" stroke="#334155" stroke-width="1.35"/>
+        <rect x="52" y="${tableTop}" width="516" height="44" fill="#f3f4eb" opacity="0.8"/>
+        <line x1="96" y1="${tableTop}" x2="96" y2="${tableTop + tableHeight}" class="grid"/>
+        <line x1="318" y1="${tableTop}" x2="318" y2="${tableTop + tableHeight}" class="grid"/>
         <line x1="398" y1="${tableTop}" x2="398" y2="${tableTop + tableHeight}" class="grid"/>
-        <line x1="484" y1="${tableTop}" x2="484" y2="${tableTop + tableHeight}" class="grid"/>
-        <line x1="36" y1="${tableTop + 44}" x2="584" y2="${tableTop + 44}" class="grid"/>
+        <line x1="482" y1="${tableTop}" x2="482" y2="${tableTop + tableHeight}" class="grid"/>
+        <line x1="52" y1="${tableTop + 44}" x2="568" y2="${tableTop + 44}" class="grid"/>
         ${tableLines}
 
-        <text x="62" y="${tableTop + 28}" text-anchor="middle" class="head">Sl</text>
-        <text x="201" y="${tableTop + 28}" text-anchor="middle" class="head">PRODUCT</text>
+        <text x="74" y="${tableTop + 28}" text-anchor="middle" class="head">Sl</text>
+        <text x="207" y="${tableTop + 28}" text-anchor="middle" class="head">PRODUCT</text>
         <text x="357" y="${tableTop + 28}" text-anchor="middle" class="head">RATE</text>
         <text x="441" y="${tableTop + 28}" text-anchor="middle" class="head">QTY</text>
         <text x="534" y="${tableTop + 28}" text-anchor="middle" class="head">AMOUNT</text>
@@ -319,18 +570,18 @@ const Invoice = () => {
         ${
           returns.length
             ? `
-        <text x="36" y="${returnsTop - 12}" class="label">ITEMS RETURNED</text>
-        <text x="580" y="${returnsTop - 12}" text-anchor="end" class="small">Returned material is adjusted in this bill</text>
-        <rect x="36" y="${returnsTop}" width="548" height="${returnsHeight}" fill="#fffef8" stroke="#202a33" stroke-width="1.2"/>
+        <text x="52" y="${returnsTop - 12}" class="label">MATERIAL RETURNED</text>
+        <text x="568" y="${returnsTop - 12}" text-anchor="end" class="small">Credit = wapas qty x rate - return labour</text>
+        <rect x="52" y="${returnsTop}" width="516" height="${returnsHeight}" fill="#fffef8" stroke="#202a33" stroke-width="1.2"/>
         <line x1="116" y1="${returnsTop}" x2="116" y2="${returnsTop + returnsHeight}" class="grid"/>
         <line x1="276" y1="${returnsTop}" x2="276" y2="${returnsTop + returnsHeight}" class="grid"/>
         <line x1="344" y1="${returnsTop}" x2="344" y2="${returnsTop + returnsHeight}" class="grid"/>
         <line x1="434" y1="${returnsTop}" x2="434" y2="${returnsTop + returnsHeight}" class="grid"/>
         <line x1="492" y1="${returnsTop}" x2="492" y2="${returnsTop + returnsHeight}" class="grid"/>
-        <line x1="36" y1="${returnsTop + 40}" x2="584" y2="${returnsTop + 40}" class="grid"/>
+        <line x1="52" y1="${returnsTop + 40}" x2="568" y2="${returnsTop + 40}" class="grid"/>
         ${returnLines}
         <text x="76" y="${returnsTop + 25}" text-anchor="middle" class="head">DATE</text>
-        <text x="196" y="${returnsTop + 25}" text-anchor="middle" class="head">RETURN ITEM</text>
+        <text x="196" y="${returnsTop + 25}" text-anchor="middle" class="head">WAPAS ITEM</text>
         <text x="310" y="${returnsTop + 25}" text-anchor="middle" class="head">RATE</text>
         <text x="389" y="${returnsTop + 25}" text-anchor="middle" class="head">QTY</text>
         <text x="463" y="${returnsTop + 25}" text-anchor="middle" class="head">LABOUR</text>
@@ -340,45 +591,37 @@ const Invoice = () => {
             : ""
         }
 
-        <text x="342" y="${totalsTop}" class="body">Items Total</text>
-        <text x="560" y="${totalsTop}" text-anchor="end" class="body strong">${formatMoney(itemTotal)}</text>
-        ${
-          deliveryCharge > 0
-            ? `<text x="342" y="${totalsTop + 30}" class="body">Delivery Charge</text>
-               <text x="560" y="${totalsTop + 30}" text-anchor="end" class="body strong">${formatMoney(deliveryCharge)}</text>`
-            : ""
-        }
-        ${
-          lateCharge > 0
-            ? `<text x="342" y="${totalsTop + 30 + (deliveryCharge > 0 ? 30 : 0)}" class="body">Late Charge</text>
-               <text x="560" y="${totalsTop + 30 + (deliveryCharge > 0 ? 30 : 0)}" text-anchor="end" class="body strong">${formatMoney(lateCharge)}</text>`
-            : ""
-        }
+        ${summaryTextRows}
         <line x1="332" y1="${totalLineY}" x2="570" y2="${totalLineY}" stroke="#202a33"/>
-        <text x="342" y="${billTotalY}" class="body strong">Bill Total</text>
-        <text x="560" y="${billTotalY}" text-anchor="end" class="body strong">${formatMoney(billOrder.subTotal)}</text>
-        <text x="342" y="${paidY}" class="body">Paid</text>
+        <text x="342" y="${billTotalY}" class="body strong">Total Bill</text>
+        <text x="560" y="${billTotalY}" text-anchor="end" class="body strong">${formatMoney(totalBillAmount)}</text>
+        <text x="342" y="${paidY}" class="body">Paid Now</text>
         <text x="560" y="${paidY}" text-anchor="end" class="body strong">${formatMoney(billOrder.paidAmount)}</text>
-        <text x="342" y="${dueY}" class="body strong" style="fill:${dueColor}">Due</text>
+        <text x="342" y="${dueY}" class="body strong" style="fill:${dueColor}">${ledgerSummary.hasLedgerContext ? "Remaining" : "Due"}</text>
         <text x="560" y="${dueY}" text-anchor="end" class="body strong" style="fill:${dueColor}">${formatMoney(dueAmount)}</text>
         ${
-          refundAmount > 0
-            ? `<text x="342" y="${dueY + 30}" class="body strong" style="fill:#b42318">Refund</text>
-               <text x="560" y="${dueY + 30}" text-anchor="end" class="body strong" style="fill:#b42318">${formatMoney(refundAmount)}</text>`
+          advanceAmount > 0
+            ? `<text x="342" y="${dueY + 30}" class="body strong" style="fill:#0b6b3a">Customer Advance</text>
+               <text x="560" y="${dueY + 30}" text-anchor="end" class="body strong" style="fill:#0b6b3a">${formatMoney(advanceAmount)}</text>`
+            : refundAmount > 0
+            ? `<text x="342" y="${dueY + 30}" class="body strong" style="fill:#b45309">Refund</text>
+               <text x="560" y="${dueY + 30}" text-anchor="end" class="body strong" style="fill:#b45309">${formatMoney(refundAmount)}</text>`
             : ""
         }
 
         ${
           billOrder.notes
-            ? `<text x="40" y="${notesY}" class="label">NOTE</text>
-               <line x1="88" y1="${notesY - 4}" x2="580" y2="${notesY - 4}" stroke="#667085" stroke-dasharray="6 6"/>
-               <text x="92" y="${notesY - 10}" class="small">${escapeXml(billOrder.notes).slice(0, 72)}</text>`
+            ? `<text x="52" y="${notesY}" class="label">NOTE</text>
+               <line x1="100" y1="${notesY - 4}" x2="568" y2="${notesY - 4}" stroke="#667085" stroke-dasharray="6 6"/>
+               <text x="104" y="${notesY - 10}" class="small">${escapeXml(billOrder.notes).slice(0, 72)}</text>`
             : ""
         }
 
-        <line x1="394" y1="${height - 78}" x2="570" y2="${height - 78}" stroke="#667085"/>
-        <text x="482" y="${height - 56}" text-anchor="middle" class="small">Signature</text>
-        <text x="310" y="${height - 28}" text-anchor="middle" class="small">Thank you for your business</text>
+        <rect x="58" y="${height - 96}" width="172" height="46" rx="4" fill="none" stroke="#d3c7ad" stroke-dasharray="5 5"/>
+        <text x="144" y="${height - 69}" text-anchor="middle" class="tiny">Checked and packed</text>
+        <line x1="394" y1="${height - 82}" x2="552" y2="${height - 82}" stroke="#8f98a6"/>
+        <text x="473" y="${height - 60}" text-anchor="middle" class="small">Authorised Signature</text>
+        <text x="310" y="${height - 30}" text-anchor="middle" class="small">Thank you for your business</text>
       </svg>
     `;
   };
@@ -505,6 +748,13 @@ const Invoice = () => {
 
   const shareBill = async () => {
     if (!order || !billPreview.blob) return;
+    const ledgerSummary = getLedgerSummary(order);
+    const returnLines = getReturnEntries(order).map((entry) => {
+      const grossReturn =
+        Number(entry.quantity || 0) * Number(entry.returnRate || 0);
+
+      return `Returned: ${entry.productName} ${entry.quantity} ${entry.unit} x ${formatMoney(entry.returnRate)} = ${formatMoney(grossReturn)}, return labour ${formatMoney(entry.labourCharge)}, credit ${formatMoney(entry.amount)}`;
+    });
 
     const file = new File(
       [billPreview.blob],
@@ -512,11 +762,28 @@ const Invoice = () => {
       { type: "image/png" }
     );
 
-    const shareText = `RM Trader Bill ${getBillNumber(
-      order
-    )}\nAmount: ${formatMoney(order.subTotal)}\nPaid: ${formatMoney(
-      order.paidAmount
-    )}\nDue: ${formatMoney(order.dueAmount)}`;
+    const shareText = [
+      `${shopName} Bill ${getBillNumber(order)}`,
+      `This Bill: ${formatMoney(order.subTotal)}`,
+      ...returnLines,
+      ledgerSummary.hasLedgerContext
+        ? `Previous Due: ${formatMoney(ledgerSummary.previousDue)}`
+        : "",
+      ledgerSummary.previousAdvance > 0
+        ? `Previous Advance: ${formatMoney(ledgerSummary.previousAdvance)}`
+        : "",
+      ledgerSummary.hasLedgerContext
+        ? `Total Bill: ${formatMoney(ledgerSummary.totalPayable)}`
+        : "",
+      `Paid Now: ${formatMoney(order.paidAmount)}`,
+      ledgerSummary.hasLedgerContext
+        ? ledgerSummary.currentAdvance > 0
+          ? `Customer Advance: ${formatMoney(ledgerSummary.currentAdvance)}`
+          : `Remaining: ${formatMoney(ledgerSummary.currentDue)}`
+        : `Due: ${formatMoney(order.dueAmount)}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
 
     try {
       if (navigator.canShare?.({ files: [file] })) {
@@ -562,10 +829,22 @@ const Invoice = () => {
   }
 
   const returnEntries = getReturnEntries(order);
+  const ledgerSummary = getLedgerSummary(order);
+  const returnSummary = getReturnSummary(order);
+  const totalBillAmount = ledgerSummary.hasLedgerContext
+    ? ledgerSummary.totalPayable
+    : Number(order.subTotal || 0);
   const refundAmount = Math.max(
-    Number(order.paidAmount || 0) - Number(order.subTotal || 0),
+    Number(order.paidAmount || 0) - totalBillAmount,
     0
   );
+  const invoiceStatus = ledgerSummary.hasLedgerContext
+    ? ledgerSummary.currentAdvance > 0
+      ? "advance"
+      : ledgerSummary.currentDue > 0
+      ? "partial"
+      : "paid"
+    : order.paymentStatus;
 
   return (
     <div className="min-h-screen bg-slate-100 p-4 sm:p-6">
@@ -603,13 +882,13 @@ const Invoice = () => {
             <div className="flex flex-col gap-6 sm:flex-row sm:justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-slate-900">
-                  Shop Manager
+                  {shopName}
                 </h1>
                 <p className="mt-1 text-sm text-slate-500">
                   Building Material Supplier
                 </p>
                 <p className="mt-2 text-sm text-slate-600">
-                  Lucknow, Uttar Pradesh
+                  {shopPhone ? `${shopAddress} | ${shopPhone}` : shopAddress}
                 </p>
               </div>
 
@@ -641,20 +920,20 @@ const Invoice = () => {
               <h3 className="mb-2 font-bold text-slate-900">Payment Status</h3>
               <span
                 className={`inline-block rounded-full px-4 py-1 text-sm font-bold capitalize ${
-                  order.paymentStatus === "paid"
+                  invoiceStatus === "paid" || invoiceStatus === "advance"
                     ? "bg-green-50 text-green-700"
-                    : order.paymentStatus === "partial"
+                    : invoiceStatus === "partial"
                     ? "bg-yellow-50 text-yellow-700"
                     : "bg-red-50 text-red-700"
                 }`}
               >
-                {order.paymentStatus}
+                {invoiceStatus}
               </span>
             </div>
           </div>
 
           <h3 className="mt-6 text-sm font-black uppercase text-slate-600">
-            Items Purchased
+            Material Given
           </h3>
           <table className="mt-2 w-full border-collapse">
             <thead>
@@ -704,10 +983,10 @@ const Invoice = () => {
             <>
               <div className="mt-8 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                 <h3 className="text-sm font-black uppercase text-slate-600">
-                  Items Returned
+                  Material Returned
                 </h3>
                 <p className="text-xs font-semibold text-slate-500">
-                  Returned material is adjusted in this bill.
+                  Credit = returned qty x return rate - wapas lane ka labour.
                 </p>
               </div>
 
@@ -716,18 +995,18 @@ const Invoice = () => {
                   <thead>
                     <tr className="bg-orange-50 text-left text-sm text-slate-700">
                       <th className="border border-slate-300 px-4 py-3">Date</th>
-                      <th className="border border-slate-300 px-4 py-3">Item</th>
+                      <th className="border border-slate-300 px-4 py-3">Wapas Item</th>
                       <th className="border border-slate-300 px-4 py-3 sm:text-right">
-                        Qty
+                        Returned Qty
                       </th>
                       <th className="border border-slate-300 px-4 py-3 sm:text-right">
                         Return Rate
                       </th>
                       <th className="border border-slate-300 px-4 py-3 sm:text-right">
-                        Labour
+                        Return Labour
                       </th>
                       <th className="border border-slate-300 px-4 py-3 sm:text-right">
-                        Credit
+                        Bill Credit
                       </th>
                     </tr>
                   </thead>
@@ -739,6 +1018,12 @@ const Invoice = () => {
                         </td>
                         <td className="border border-slate-300 px-4 py-3 font-semibold">
                           {entry.productName}
+                          <p className="mt-1 text-xs font-medium text-slate-500">
+                            {entry.quantity} {entry.unit} x ₹{entry.returnRate || 0} = ₹
+                            {Number(entry.quantity || 0) *
+                              Number(entry.returnRate || 0)}
+                            , labour ₹{entry.labourCharge || 0}
+                          </p>
                         </td>
                         <td className="border border-slate-300 px-4 py-3 sm:text-right">
                           {entry.quantity} {entry.unit}
@@ -762,9 +1047,45 @@ const Invoice = () => {
 
           <div className="mt-6 flex justify-end">
             <div className="w-full max-w-sm space-y-3">
+              <div className="flex justify-between border-b border-slate-200 pb-2">
+                <span className="text-slate-600">Material Given</span>
+                <span className="font-bold text-slate-900">
+                  ₹
+                  {order.items.reduce(
+                    (sum, item) => sum + Number(item.total || 0),
+                    0
+                  )}
+                </span>
+              </div>
+
+              {returnSummary.gross > 0 && (
+                <>
+                  <div className="flex justify-between border-b border-slate-200 pb-2">
+                    <span className="text-slate-600">Material Returned</span>
+                    <span className="font-bold text-green-700">
+                      -₹{returnSummary.gross}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between border-b border-slate-200 pb-2">
+                    <span className="text-slate-600">Return Labour</span>
+                    <span className="font-bold text-orange-700">
+                      ₹{returnSummary.labour}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between border-b border-slate-200 pb-2">
+                    <span className="font-bold text-slate-700">Return Credit</span>
+                    <span className="font-bold text-green-700">
+                      -₹{returnSummary.credit}
+                    </span>
+                  </div>
+                </>
+              )}
+
               {Number(order.deliveryCharge || 0) > 0 && (
                 <div className="flex justify-between border-b border-slate-200 pb-2">
-                  <span className="text-slate-600">Delivery Charge</span>
+                  <span className="text-slate-600">Labour Charge</span>
                   <span className="font-bold text-slate-900">
                     ₹{order.deliveryCharge}
                   </span>
@@ -772,33 +1093,71 @@ const Invoice = () => {
               )}
 
               <div className="flex justify-between border-b border-slate-200 pb-2">
-                <span className="text-slate-600">Grand Total</span>
+                <span className="text-slate-600">This Bill</span>
                 <span className="font-bold text-slate-900">
                   ₹{order.subTotal}
                 </span>
               </div>
 
+              {ledgerSummary.hasLedgerContext && (
+                <>
+                  <div className="flex justify-between border-b border-slate-200 pb-2">
+                    <span className="text-slate-600">Previous Due</span>
+                    <span className="font-bold text-orange-700">
+                      ₹{ledgerSummary.previousDue}
+                    </span>
+                  </div>
+
+                  {ledgerSummary.previousAdvance > 0 && (
+                    <div className="flex justify-between border-b border-slate-200 pb-2">
+                      <span className="text-slate-600">Previous Advance</span>
+                      <span className="font-bold text-green-700">
+                        ₹{ledgerSummary.previousAdvance}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between border-b border-slate-200 pb-2">
+                    <span className="font-bold text-slate-700">Total Bill</span>
+                    <span className="font-bold text-amber-700">
+                      ₹{ledgerSummary.totalPayable}
+                    </span>
+                  </div>
+                </>
+              )}
+
               <div className="flex justify-between border-b border-slate-200 pb-2">
-                <span className="text-slate-600">Paid Amount</span>
+                <span className="text-slate-600">Paid Now</span>
                 <span className="font-bold text-green-700">
                   ₹{order.paidAmount}
                 </span>
               </div>
 
               <div className="flex justify-between rounded-xl bg-red-50 px-4 py-3">
-                <span className="font-bold text-red-700">Due Amount</span>
                 <span className="font-bold text-red-700">
-                  ₹{order.dueAmount}
+                  {ledgerSummary.hasLedgerContext ? "Remaining" : "Due Amount"}
+                </span>
+                <span className="font-bold text-red-700">
+                  ₹{ledgerSummary.hasLedgerContext ? ledgerSummary.currentDue : order.dueAmount}
                 </span>
               </div>
 
-              {refundAmount > 0 && (
-                <div className="flex justify-between rounded-xl bg-orange-50 px-4 py-3">
-                  <span className="font-bold text-orange-700">Refund</span>
-                  <span className="font-bold text-orange-700">
-                    ₹{refundAmount}
+              {ledgerSummary.currentAdvance > 0 ? (
+                <div className="flex justify-between rounded-xl bg-green-50 px-4 py-3">
+                  <span className="font-bold text-green-700">Customer Advance</span>
+                  <span className="font-bold text-green-700">
+                    ₹{ledgerSummary.currentAdvance}
                   </span>
                 </div>
+              ) : (
+                refundAmount > 0 && (
+                  <div className="flex justify-between rounded-xl bg-orange-50 px-4 py-3">
+                    <span className="font-bold text-orange-700">Refund</span>
+                    <span className="font-bold text-orange-700">
+                      ₹{refundAmount}
+                    </span>
+                  </div>
+                )
               )}
             </div>
           </div>
@@ -838,7 +1197,7 @@ const Invoice = () => {
               </button>
             </div>
 
-            <div className="max-h-[68vh] overflow-y-auto bg-[color:var(--shop-panel-2)] p-4 sm:p-6">
+            <div className="max-h-[68vh] overflow-y-auto bg-[#e7edf4] p-4 sm:p-6">
               {billPreview.loading ? (
                 <div className="flex min-h-80 items-center justify-center rounded-xl bg-[color:var(--shop-panel)] text-sm font-bold text-slate-500">
                   Generating bill image...
@@ -851,7 +1210,7 @@ const Invoice = () => {
                 <img
                   src={billPreview.imageUrl}
                   alt="Bill preview"
-                  className="mx-auto max-h-[58vh] w-auto max-w-full rounded-xl border bg-white object-contain shadow-lg"
+                  className="mx-auto max-h-[58vh] w-auto max-w-full rounded-md border bg-white object-contain shadow-2xl"
                   style={{ borderColor: "var(--shop-border)" }}
                 />
               )}

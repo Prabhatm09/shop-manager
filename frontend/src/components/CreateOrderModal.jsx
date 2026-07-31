@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Minus, Plus, X } from "lucide-react";
+import { Minus, Plus, Search, ShoppingCart, X } from "lucide-react";
 import API from "../api/axios";
 import LoadingState from "./LoadingState";
+import { AmountDisplay, StatusBadge } from "./pos";
 
 const steps = ["Items", "Customer", "Payment"];
 
@@ -116,6 +117,8 @@ const toNumber = (value) => Number(value);
 const isValidNumber = (value) => Number.isFinite(toNumber(value));
 const safeNumber = (value, fallback = 0) =>
   isValidNumber(value) ? toNumber(value) : fallback;
+const formatMoney = (amount) =>
+  `₹${Number(amount || 0).toLocaleString("en-IN")}`;
 const getPhoneDigits = (phone) => String(phone || "").replace(/\D/g, "");
 
 const CreateOrderModal = ({ open, onClose }) => {
@@ -123,21 +126,33 @@ const CreateOrderModal = ({ open, onClose }) => {
   const [orderType, setOrderType] = useState("sale");
   const [products, setProducts] = useState([]);
   const [selectedItems, setSelectedItems] = useState([]);
+  const [manualOutsource, setManualOutsource] = useState({
+    productName: "",
+    quantity: "",
+    unit: "",
+    pricePerUnit: "",
+  });
   const [search, setSearch] = useState("");
   const [message, setMessage] = useState("");
   const [dataLoading, setDataLoading] = useState(false);
 
   const [customers, setCustomers] = useState([]);
   const [customerMode, setCustomerMode] = useState("existing");
+  const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [newCustomer, setNewCustomer] = useState({
     name: "",
     phone: "",
     address: "",
   });
+  const [customerBalance, setCustomerBalance] = useState({
+    loading: false,
+    previousDue: 0,
+    previousAdvance: 0,
+  });
 
   const [paymentMode, setPaymentMode] = useState("cash");
-  const [paymentOption, setPaymentOption] = useState("full");
+  const [paymentOption, setPaymentOption] = useState("later");
   const [paidAmount, setPaidAmount] = useState("");
   const [deliveryCharge, setDeliveryCharge] = useState("");
   const [securityDeposit, setSecurityDeposit] = useState("");
@@ -175,6 +190,52 @@ const CreateOrderModal = ({ open, onClose }) => {
     if (open) fetchModalData();
   }, [open]);
 
+  useEffect(() => {
+    let ignore = false;
+
+    const fetchCustomerBalance = async () => {
+      if (!selectedCustomerId || customerMode !== "existing") {
+        setCustomerBalance({
+          loading: false,
+          previousDue: 0,
+          previousAdvance: 0,
+        });
+        return;
+      }
+
+      try {
+        setCustomerBalance((balance) => ({
+          ...balance,
+          loading: true,
+        }));
+
+        const res = await API.get(`/customers/${selectedCustomerId}`);
+
+        if (ignore) return;
+
+        setCustomerBalance({
+          loading: false,
+          previousDue: Number(res.data.summary?.totalDue || 0),
+          previousAdvance: Number(res.data.summary?.totalAdvance || 0),
+        });
+      } catch {
+        if (ignore) return;
+
+        setCustomerBalance({
+          loading: false,
+          previousDue: 0,
+          previousAdvance: 0,
+        });
+      }
+    };
+
+    fetchCustomerBalance();
+
+    return () => {
+      ignore = true;
+    };
+  }, [selectedCustomerId, customerMode]);
+
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
       const matchesSearch = product.name
@@ -194,6 +255,17 @@ const CreateOrderModal = ({ open, onClose }) => {
       return true;
     });
   }, [products, orderType, search]);
+
+  const filteredCustomers = useMemo(() => {
+    const keyword = customerSearch.toLowerCase();
+
+    return customers.filter(
+      (customer) =>
+        customer.name?.toLowerCase().includes(keyword) ||
+        customer.phone?.toLowerCase().includes(keyword) ||
+        customer.address?.toLowerCase().includes(keyword)
+    );
+  }, [customers, customerSearch]);
 
   const getSelectedItem = (productId) => {
     return selectedItems.find((item) => item.productId === productId);
@@ -223,6 +295,7 @@ const CreateOrderModal = ({ open, onClose }) => {
         pricePerUnit: Number(defaultUnit.pricePerUnit || product.pricePerUnit || 0),
         currentStock: Number(product.currentStock || 0),
         quantity: 1,
+        source: "shop_stock",
         quickQuantities:
           product.subCategory?.toLowerCase() === "brick" ? [10, 50, 100] : [],
         saleUnits,
@@ -230,13 +303,28 @@ const CreateOrderModal = ({ open, onClose }) => {
     ]);
   };
 
-  const updateQuantity = (productId, quantity) => {
+  const updateQuantity = (productId, quantity, removeWhenZero = false) => {
+    if (quantity === "") {
+      setSelectedItems(
+        selectedItems.map((item) =>
+          item.productId === productId ? { ...item, quantity: "" } : item
+        )
+      );
+      return;
+    }
+
     const finalQuantity = Number(quantity);
 
+    if (!Number.isFinite(finalQuantity)) {
+      return;
+    }
+
     if (finalQuantity <= 0) {
-      setSelectedItems(
-        selectedItems.filter((item) => item.productId !== productId)
-      );
+      if (removeWhenZero) {
+        setSelectedItems(
+          selectedItems.filter((item) => item.productId !== productId)
+        );
+      }
       return;
     }
 
@@ -247,7 +335,7 @@ const CreateOrderModal = ({ open, onClose }) => {
         const stockDeduct =
           finalQuantity * Number(item.conversionToBase || 1);
 
-        if (stockDeduct > item.currentStock) {
+        if (item.source !== "outsourced" && stockDeduct > item.currentStock) {
           return item;
         }
 
@@ -290,10 +378,78 @@ const CreateOrderModal = ({ open, onClose }) => {
     })
   );
 };
+
+ const updateItemSource = (productId, source) => {
+  setSelectedItems(
+    selectedItems.map((item) => {
+      if (item.productId !== productId) return item;
+
+      return {
+        ...item,
+        source,
+      };
+    })
+  );
+};
+
   const removeItem = (productId) => {
     setSelectedItems(
       selectedItems.filter((item) => item.productId !== productId)
     );
+  };
+
+  const addManualOutsourceItem = () => {
+    const productName = manualOutsource.productName.trim();
+    const quantity = Number(manualOutsource.quantity);
+    const pricePerUnit = Number(manualOutsource.pricePerUnit);
+    const unit = manualOutsource.unit.trim();
+
+    if (!productName) {
+      setMessage("Enter outsource material name");
+      return;
+    }
+
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      setMessage("Enter valid outsource quantity");
+      return;
+    }
+
+    if (!unit) {
+      setMessage("Enter outsource unit");
+      return;
+    }
+
+    if (!Number.isFinite(pricePerUnit) || pricePerUnit <= 0) {
+      setMessage("Enter valid outsource sale rate");
+      return;
+    }
+
+    setSelectedItems([
+      ...selectedItems,
+      {
+        productId: `manual-${Date.now()}`,
+        isManual: true,
+        name: productName,
+        selectedUnit: unit,
+        unit,
+        stockBaseUnit: unit,
+        conversionToBase: 1,
+        pricePerUnit,
+        currentStock: 0,
+        quantity,
+        source: "outsourced",
+        quickQuantities: [],
+        saleUnits: [{ unit, conversionToBase: 1, pricePerUnit }],
+      },
+    ]);
+
+    setManualOutsource({
+      productName: "",
+      quantity: "",
+      unit: "",
+      pricePerUnit: "",
+    });
+    setMessage("");
   };
 
   const itemsTotal = selectedItems.reduce((sum, item) => {
@@ -314,15 +470,25 @@ const CreateOrderModal = ({ open, onClose }) => {
 
   const deliveryChargeAmount = safeNumber(deliveryCharge);
   const grandTotal = itemsTotal + deliveryChargeAmount;
+  const previousDue =
+    customerMode === "existing" ? customerBalance.previousDue : 0;
+  const previousAdvance =
+    customerMode === "existing" ? customerBalance.previousAdvance : 0;
 
+  const totalPayable = Math.max(grandTotal + previousDue - previousAdvance, 0);
   const finalPaidAmount =
     paymentOption === "full"
-      ? grandTotal
+      ? totalPayable
       : paymentOption === "later"
       ? 0
       : safeNumber(paidAmount);
 
   const dueAmount = Math.max(grandTotal - finalPaidAmount, 0);
+  const customerOutstanding = Math.max(
+    previousDue + grandTotal - previousAdvance - finalPaidAmount,
+    0
+  );
+  const customerAdvance = Math.max(finalPaidAmount - totalPayable, 0);
   const isRentalOrder = orderType === "rental" || orderType === "both";
 
   const getItemsValidationError = () => {
@@ -345,9 +511,13 @@ const CreateOrderModal = ({ open, onClose }) => {
         return `Invalid unit conversion for ${item.name}`;
       }
 
-      if (quantity * conversionToBase > Number(item.currentStock || 0)) {
+      if (
+        item.source !== "outsourced" &&
+        quantity * conversionToBase > Number(item.currentStock || 0)
+      ) {
         return `${item.name} stock not enough`;
       }
+
     }
 
     if (!Number.isFinite(itemsTotal) || itemsTotal <= 0) {
@@ -374,7 +544,7 @@ const CreateOrderModal = ({ open, onClose }) => {
 
   const getPaymentValidationError = () => {
     if (!isValidNumber(deliveryChargeAmount) || deliveryChargeAmount < 0) {
-      return "Delivery charge cannot be negative";
+      return "Labour charge cannot be negative";
     }
 
     if (!Number.isFinite(grandTotal) || grandTotal <= 0) {
@@ -390,13 +560,6 @@ const CreateOrderModal = ({ open, onClose }) => {
         return "Enter a valid partial payment amount";
       }
 
-      if (Number(paidAmount) >= grandTotal) {
-        return "Use Full Payment when customer pays the full bill";
-      }
-    }
-
-    if (finalPaidAmount > grandTotal) {
-      return "Paid amount cannot be greater than bill total";
     }
 
     if (isRentalOrder) {
@@ -507,11 +670,13 @@ const CreateOrderModal = ({ open, onClose }) => {
         deliveryCharge: deliveryChargeAmount,
         notes,
         items: selectedItems.map((item) => ({
-          productId: item.productId,
+          productId: item.isManual ? undefined : item.productId,
+          productName: item.name,
           selectedUnit: item.selectedUnit,
           quantity: Number(item.quantity),
           pricePerUnit: Number(item.pricePerUnit),
           conversionToBase: Number(item.conversionToBase || 1),
+          source: item.source || "shop_stock",
         })),
       };
 
@@ -542,16 +707,28 @@ const CreateOrderModal = ({ open, onClose }) => {
     setActiveStep(0);
     setOrderType("sale");
     setSelectedItems([]);
+    setManualOutsource({
+      productName: "",
+      quantity: "",
+      unit: "",
+      pricePerUnit: "",
+    });
     setCustomerMode("existing");
     setSelectedCustomerId("");
+    setCustomerSearch("");
     setNewCustomer({
       name: "",
       phone: "",
       address: "",
     });
+    setCustomerBalance({
+      loading: false,
+      previousDue: 0,
+      previousAdvance: 0,
+    });
 
     setPaymentMode("cash");
-    setPaymentOption("full");
+    setPaymentOption("later");
     setPaidAmount("");
     setDeliveryCharge("");
     setSecurityDeposit("");
@@ -574,15 +751,18 @@ const CreateOrderModal = ({ open, onClose }) => {
   if (!open) return null;
 
   return (
-    <div className="mobile-sheet fixed inset-0 z-50 flex bg-black/50 sm:px-4">
-      <div className="modal-panel max-h-[98vh] w-full max-w-6xl overflow-hidden">
-        <div className="flex items-center justify-between border-b px-6 py-4">
+    <div className="fixed inset-0 z-50 bg-slate-100">
+      <div className="flex h-full flex-col overflow-hidden bg-slate-100">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">
-              Create New Order
+            <p className="text-xs font-black uppercase tracking-wide text-amber-700">
+              POS Billing
+            </p>
+            <h2 className="text-xl font-black text-slate-950">
+              New Order
             </h2>
-            <p className="text-sm text-slate-500">
-              Sale, rental, or mixed order
+            <p className="text-sm font-medium text-slate-500">
+              Add material, customer and payment without changing stock rules.
             </p>
           </div>
 
@@ -595,26 +775,26 @@ const CreateOrderModal = ({ open, onClose }) => {
           </button>
         </div>
 
-        <div className="border-b border-slate-200 px-6 py-4">
+        <div className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
             {steps.map((step, index) => (
               <div
                 key={step}
-                className={`rounded-xl px-3 py-3 text-center text-sm font-bold ${
+                className={`rounded-xl border px-3 py-3 text-center text-sm font-black ${
                   index === activeStep
-                    ? "bg-[color:var(--shop-primary)] text-white"
-                    : "bg-slate-100 text-slate-500"
+                    ? "border-slate-800 bg-slate-800 text-white"
+                    : "border-slate-200 bg-slate-50 text-slate-500"
                 }`}
               >
-                Step {index + 1}: {step}
+                {index + 1}. {step}
               </div>
             ))}
           </div>
         </div>
 
-        <div className="max-h-[65vh] overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 pb-28 sm:p-6">
           {message && (
-            <div className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
               {message}
             </div>
           )}
@@ -623,7 +803,7 @@ const CreateOrderModal = ({ open, onClose }) => {
             <LoadingState label="Loading products and customers..." />
           ) : activeStep === 0 && (
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_360px]">
-              <section>
+              <section className="space-y-5">
                 <div className="mb-5 grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
                   {orderTabs.map((tab) => (
                     <button
@@ -644,12 +824,103 @@ const CreateOrderModal = ({ open, onClose }) => {
                   ))}
                 </div>
 
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search product..."
-                  className="mb-5 form-control px-4 py-3"
-                />
+                <div className="relative">
+                  <Search
+                    size={18}
+                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search godown product..."
+                    className="form-control py-3 pl-11 pr-4"
+                  />
+                </div>
+
+                <div className="rounded-2xl border border-purple-200 bg-purple-50 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-black text-slate-900">
+                        Manual Outsource Item
+                      </h3>
+                      <p className="mt-1 text-xs font-semibold text-slate-500">
+                        Use when material is not coming from godown stock.
+                      </p>
+                    </div>
+                    <StatusBadge label="Outsource" tone="outsource" />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                    <input
+                      value={manualOutsource.productName}
+                      onChange={(e) =>
+                        setManualOutsource({
+                          ...manualOutsource,
+                          productName: e.target.value,
+                        })
+                      }
+                      className="form-control px-3 py-2 text-sm lg:col-span-2"
+                      placeholder="Example: Balu"
+                    />
+                    <input
+                      value={manualOutsource.quantity}
+                      onChange={(e) =>
+                        setManualOutsource({
+                          ...manualOutsource,
+                          quantity: e.target.value,
+                        })
+                      }
+                      type="number"
+                      min="0.001"
+                      step="0.001"
+                      className="form-control px-3 py-2 text-sm"
+                      placeholder="Example: 50"
+                    />
+                    <input
+                      value={manualOutsource.unit}
+                      onChange={(e) =>
+                        setManualOutsource({
+                          ...manualOutsource,
+                          unit: e.target.value,
+                        })
+                      }
+                      className="form-control px-3 py-2 text-sm"
+                      placeholder="Example: feet"
+                    />
+                    <input
+                      value={manualOutsource.pricePerUnit}
+                      onChange={(e) =>
+                        setManualOutsource({
+                          ...manualOutsource,
+                          pricePerUnit: e.target.value,
+                        })
+                      }
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      className="form-control px-3 py-2 text-sm"
+                      placeholder="Example: 35"
+                    />
+                  </div>
+
+                  <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm font-black text-slate-700">
+                      Amount:{" "}
+                      {formatMoney(
+                        safeNumber(manualOutsource.quantity) *
+                          safeNumber(manualOutsource.pricePerUnit)
+                      )}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={addManualOutsourceItem}
+                      className="btn-primary text-sm"
+                    >
+                      <Plus size={16} />
+                      Add Outsource Item
+                    </button>
+                  </div>
+                </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   {filteredProducts.length === 0 ? (
@@ -665,7 +936,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                       return (
                         <div
                           key={product._id}
-                          className="surface-flat p-4"
+                          className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div>
@@ -678,21 +949,16 @@ const CreateOrderModal = ({ open, onClose }) => {
                               </p>
                             </div>
 
-                            <span
-                              className={`rounded-full px-3 py-1 text-xs font-bold ${
-                                isOutOfStock
-                                  ? "bg-red-50 text-red-700"
-                                  : "bg-green-50 text-green-700"
-                              }`}
-                            >
-                              Stock: {product.currentStock || 0}
-                            </span>
+                            <StatusBadge
+                              label={`Stock: ${product.currentStock || 0}`}
+                              tone={isOutOfStock ? "out of stock" : "in stock"}
+                            />
                           </div>
 
                           {!selected ? (
                             <div className="mt-4 flex items-center justify-between">
-                              <p className="text-lg font-bold text-slate-900">
-                                ₹{defaultUnit.pricePerUnit}
+                              <p className="text-lg font-black text-slate-900">
+                                <AmountDisplay amount={defaultUnit.pricePerUnit} />
                                 <span className="text-sm font-medium text-slate-500">
                                   /{defaultUnit.unit}
                                 </span>
@@ -700,7 +966,6 @@ const CreateOrderModal = ({ open, onClose }) => {
 
                               <button
                                 type="button"
-                                disabled={isOutOfStock}
                                 onClick={() => addProduct(product)}
                                 className="btn-primary text-sm"
                               >
@@ -760,6 +1025,33 @@ const CreateOrderModal = ({ open, onClose }) => {
                                 </div>
                               )}
 
+                              <div>
+                                <p className="mb-2 text-xs font-bold text-slate-500">
+                                  Source
+                                </p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {[
+                                    { label: "Godown", value: "shop_stock" },
+                                    { label: "Outsource", value: "outsourced" },
+                                  ].map((option) => (
+                                    <button
+                                      key={option.value}
+                                      type="button"
+                                      onClick={() =>
+                                        updateItemSource(product._id, option.value)
+                                      }
+                                      className={`rounded-lg px-3 py-2 text-xs font-bold ${
+                                        (selected.source || "shop_stock") === option.value
+                                          ? "bg-[color:var(--shop-primary)] text-white"
+                                          : "bg-slate-100 text-slate-700"
+                                      }`}
+                                    >
+                                      {option.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
                               <div className="flex items-center justify-between gap-3">
                                 <div>
                                   <label className="mb-1 block text-xs font-bold text-slate-500">
@@ -783,7 +1075,8 @@ const CreateOrderModal = ({ open, onClose }) => {
                                     onClick={() =>
                                       updateQuantity(
                                         product._id,
-                                        selected.quantity - 1
+                                        safeNumber(selected.quantity) - 1,
+                                        true
                                       )
                                     }
                                     className="btn-muted p-2"
@@ -805,7 +1098,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                                     onClick={() =>
                                       updateQuantity(
                                         product._id,
-                                        selected.quantity + 1
+                                        safeNumber(selected.quantity) + 1
                                       )
                                     }
                                     className="btn-muted p-2"
@@ -816,12 +1109,12 @@ const CreateOrderModal = ({ open, onClose }) => {
                               </div>
 
                               <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
-                                Stock deduct:{" "}
-                                {(
-                                  Number(selected.quantity || 0) *
-                                  Number(selected.conversionToBase || 1)
-                                ).toFixed(2)}{" "}
-                                {selected.stockBaseUnit}
+                                {(selected.source || "shop_stock") === "outsourced"
+                                  ? "Godown stock: no deduction"
+                                  : `Stock deduct: ${(
+                                      Number(selected.quantity || 0) *
+                                      Number(selected.conversionToBase || 1)
+                                    ).toFixed(2)} ${selected.stockBaseUnit}`}
                               </p>
                             </div>
                           )}
@@ -832,10 +1125,13 @@ const CreateOrderModal = ({ open, onClose }) => {
                 </div>
               </section>
 
-              <aside className="surface-flat xl:sticky xl:top-4 xl:self-start p-5">
-                <h3 className="text-lg font-bold text-slate-900">
+              <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:sticky xl:top-4 xl:self-start">
+                <div className="flex items-center justify-between gap-3">
+                <h3 className="text-lg font-black text-slate-950">
                   Selected Items
                 </h3>
+                <ShoppingCart size={20} className="text-amber-700" />
+                </div>
 
                 <div className="mt-4 space-y-3">
                   {selectedItems.length === 0 ? (
@@ -846,7 +1142,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                     selectedItems.map((item) => (
                       <div
                         key={item.productId}
-                        className="surface-flat p-4"
+                        className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
                       >
                         <div className="flex justify-between gap-3">
                           <div>
@@ -857,6 +1153,11 @@ const CreateOrderModal = ({ open, onClose }) => {
                               {item.quantity} {item.selectedUnit} × ₹
                               {item.pricePerUnit}
                             </p>
+                            <StatusBadge
+                              label={item.source === "outsourced" ? "Outsource" : "Godown"}
+                              tone={item.source === "outsourced" ? "outsource" : "godown"}
+                              className="mt-2"
+                            />
                           </div>
 
                           <button
@@ -876,10 +1177,10 @@ const CreateOrderModal = ({ open, onClose }) => {
                   )}
                 </div>
 
-                <div className="mt-5 bill-panel p-4">
+                <div className="mt-5 rounded-2xl bg-slate-950 p-4 text-white">
                   <div className="flex justify-between">
                     <span>Items Total</span>
-                    <span className="font-bold">₹{itemsTotal}</span>
+                    <span className="font-bold">{formatMoney(itemsTotal)}</span>
                   </div>
                 </div>
               </aside>
@@ -915,10 +1216,22 @@ const CreateOrderModal = ({ open, onClose }) => {
               </div>
 
               {customerMode === "existing" ? (
-                <div className="surface p-6">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    Select Customer
+                    Search Customer
                   </label>
+                  <div className="relative mb-3">
+                    <Search
+                      size={18}
+                      className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <input
+                      value={customerSearch}
+                      onChange={(e) => setCustomerSearch(e.target.value)}
+                      placeholder="Search by name, phone or address"
+                      className="form-control py-3 pl-11 pr-4"
+                    />
+                  </div>
 
                   <select
                     value={selectedCustomerId}
@@ -926,15 +1239,32 @@ const CreateOrderModal = ({ open, onClose }) => {
                     className="form-control px-4 py-3"
                   >
                     <option value="">Choose customer</option>
-                    {customers.map((customer) => (
+                    {filteredCustomers.map((customer) => (
                       <option key={customer._id} value={customer._id}>
                         {customer.name} - {customer.phone}
                       </option>
                     ))}
                   </select>
+
+                  {selectedCustomerId && (
+                    <div className="mt-4 rounded-xl border border-orange-200 bg-orange-50 p-4">
+                      <p className="text-xs font-bold uppercase text-orange-700">
+                        Previous Balance
+                      </p>
+                      <p className="mt-1 text-2xl font-black text-orange-900">
+                        {customerBalance.loading
+                          ? "Checking..."
+                          : previousDue > 0
+                          ? `Due ₹${previousDue}`
+                          : previousAdvance > 0
+                          ? `Advance ₹${previousAdvance}`
+                          : "₹0"}
+                      </p>
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div className="surface p-6">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="space-y-4">
                     <input
                       name="name"
@@ -1032,8 +1362,8 @@ const CreateOrderModal = ({ open, onClose }) => {
                   </div>
                 )}
 
-                <div className="surface p-5">
-                  <h3 className="mb-4 font-bold text-slate-900">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <h3 className="mb-4 font-black text-slate-950">
                     Payment Details
                   </h3>
 
@@ -1055,9 +1385,9 @@ const CreateOrderModal = ({ open, onClose }) => {
                       }}
                       className="form-control px-4 py-3"
                     >
-                      <option value="full">Full Payment</option>
-                      <option value="partial">Partial Payment</option>
                       <option value="later">Pay Later</option>
+                      <option value="partial">Custom Payment</option>
+                      <option value="full">Full Payment</option>
                     </select>
 
                     {paymentOption === "partial" && (
@@ -1074,7 +1404,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                       type="number"
                       value={deliveryCharge}
                       onChange={(e) => setDeliveryCharge(e.target.value)}
-                      placeholder="Delivery charge"
+                      placeholder="Labour charge"
                       className="form-control px-4 py-3"
                     />
                   </div>
@@ -1097,14 +1427,14 @@ const CreateOrderModal = ({ open, onClose }) => {
                 </div>
               </section>
 
-              <aside className="surface-flat xl:sticky xl:top-4 xl:self-start p-5">
-                <h3 className="text-lg font-bold text-slate-900">
+              <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:sticky xl:top-4 xl:self-start">
+                <h3 className="text-lg font-black text-slate-950">
                   Order Summary
                 </h3>
 
                 <div className="mt-4 space-y-3">
                   {selectedItems.map((item) => (
-                    <div key={item.productId} className="rounded-xl bg-white p-3">
+                    <div key={item.productId} className="rounded-xl bg-slate-50 p-3">
                       <div className="flex justify-between gap-3 text-sm">
                         <span className="font-semibold text-slate-900">
                           {item.name}
@@ -1121,33 +1451,73 @@ const CreateOrderModal = ({ open, onClose }) => {
                   ))}
                 </div>
 
-                <div className="mt-5 bill-panel p-4">
+                <div className="mt-5 rounded-2xl bg-slate-950 p-4 text-white">
                   <div className="flex justify-between text-sm">
                     <span>Items Total</span>
                     <span className="font-bold">₹{itemsTotal}</span>
                   </div>
 
                   <div className="mt-2 flex justify-between text-sm">
-                    <span>Delivery Charge</span>
+                    <span>Labour Charge</span>
                     <span className="font-bold">₹{deliveryChargeAmount}</span>
                   </div>
 
                   <div className="mt-3 border-t border-slate-700 pt-3">
                     <div className="flex justify-between text-lg">
-                      <span>Grand Total</span>
+                      <span>This Bill</span>
                       <span className="font-bold">₹{grandTotal}</span>
                     </div>
 
+                    {(previousDue > 0 || previousAdvance > 0) && (
+                      <>
+                        <div className="mt-2 flex justify-between text-sm">
+                          <span>Previous Due</span>
+                          <span className="font-bold text-orange-300">
+                            ₹{previousDue}
+                          </span>
+                        </div>
+
+                        {previousAdvance > 0 && (
+                          <div className="mt-2 flex justify-between text-sm">
+                            <span>Previous Advance</span>
+                            <span className="font-bold text-green-300">
+                              ₹{previousAdvance}
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="mt-2 flex justify-between text-sm">
+                          <span>Total Bill</span>
+                          <span className="font-bold text-amber-300">
+                            ₹{totalPayable}
+                          </span>
+                        </div>
+                      </>
+                    )}
+
                     <div className="mt-2 flex justify-between text-sm">
-                      <span>Paid</span>
+                      <span>Paid Now</span>
                       <span className="font-bold text-green-300">
                         ₹{finalPaidAmount}
                       </span>
                     </div>
 
-                    <div className="mt-2 flex justify-between text-sm">
-                      <span>Due</span>
-                      <span className="font-bold text-red-300">₹{dueAmount}</span>
+                    <div className="mt-3 border-t border-slate-700 pt-3">
+                      {customerAdvance > 0 ? (
+                        <div className="flex justify-between text-base">
+                          <span>Customer Advance</span>
+                          <span className="font-black text-green-300">
+                            ₹{customerAdvance}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex justify-between text-base">
+                          <span>Remaining</span>
+                          <span className="font-black text-red-300">
+                            ₹{previousDue > 0 || previousAdvance > 0 ? customerOutstanding : dueAmount}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1156,7 +1526,10 @@ const CreateOrderModal = ({ open, onClose }) => {
           )}
         </div>
 
-        <div className="thumb-footer flex flex-col-reverse gap-3 border-t border-slate-200 px-4 py-4 sm:flex-row sm:justify-between sm:px-6">
+        <div className="thumb-footer flex flex-col-reverse gap-3 border-t border-slate-200 bg-white px-4 py-4 sm:flex-row sm:justify-between sm:px-6">
+          <div className="hidden text-sm font-bold text-slate-600 sm:block">
+            Total: <span className="text-lg text-slate-950">{formatMoney(totalPayable || grandTotal || itemsTotal)}</span>
+          </div>
           <button
             type="button"
             onClick={() => {
