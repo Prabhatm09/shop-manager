@@ -3,15 +3,34 @@ const StockMovement = require("../models/StockMovement");
 
 const isFiniteNumber = (value) => Number.isFinite(Number(value));
 
-const normalizeSaleUnits = (saleUnits = []) => {
+const normalizeSaleUnits = (saleUnits = [], product = {}) => {
   if (!Array.isArray(saleUnits)) return [];
 
+  const subCategory = String(product.subCategory || "").toLowerCase();
+  const baseUnit = String(product.unit || "").toLowerCase();
+
   return saleUnits
-    .map((unit) => ({
-      unit: String(unit.unit || "").trim(),
-      conversionToBase: Number(unit.conversionToBase || 1),
-      pricePerUnit: Number(unit.pricePerUnit || 0),
-    }))
+    .map((unit) => {
+      const saleUnit = String(unit.unit || "").trim();
+      let conversionToBase = Number(unit.conversionToBase || 1);
+
+      if (
+        ["balu", "maurang", "gitti"].includes(subCategory) &&
+        saleUnit.toLowerCase() === "feet"
+      ) {
+        conversionToBase = 1;
+      }
+
+      if (saleUnit.toLowerCase() === baseUnit) {
+        conversionToBase = 1;
+      }
+
+      return {
+        unit: saleUnit,
+        conversionToBase,
+        pricePerUnit: Number(unit.pricePerUnit || 0),
+      };
+    })
     .filter(
       (unit) =>
         unit.unit &&
@@ -74,7 +93,7 @@ const createProduct = async (req, res) => {
         currentStock: openingStock,
         lowStockAlert: finalLowStockAlert,
         description: description || "",
-        saleUnits: normalizeSaleUnits(saleUnits),
+        saleUnits: normalizeSaleUnits(saleUnits, { subCategory, unit }),
         quickQuantities: quickQuantities || [],
         createdBy: req.user._id,
     });
@@ -172,6 +191,17 @@ const getProductById = async (req, res) => {
 
 const updateProduct = async (req, res) => {
   try {
+    const existingProduct = await Product.findOne({
+      _id: req.params.id,
+      createdBy: req.user._id,
+    });
+
+    if (!existingProduct) {
+      return res.status(404).json({
+        message: "Product not found",
+      });
+    }
+
     if (
       req.body.pricePerUnit !== undefined &&
       (!isFiniteNumber(req.body.pricePerUnit) || Number(req.body.pricePerUnit) < 0)
@@ -207,7 +237,10 @@ const updateProduct = async (req, res) => {
       description: req.body.description,
       saleUnits:
         req.body.saleUnits !== undefined
-          ? normalizeSaleUnits(req.body.saleUnits)
+          ? normalizeSaleUnits(req.body.saleUnits, {
+              subCategory: req.body.subCategory || existingProduct.subCategory,
+              unit: req.body.unit || existingProduct.unit,
+            })
           : undefined,
       quickQuantities: req.body.quickQuantities,
       isActive: req.body.isActive,
@@ -221,8 +254,7 @@ const updateProduct = async (req, res) => {
 
     const product = await Product.findOneAndUpdate(
       {
-        _id: req.params.id,
-        createdBy: req.user._id,
+        _id: existingProduct._id,
       },
       allowedFields,
       {
@@ -230,12 +262,6 @@ const updateProduct = async (req, res) => {
         runValidators: true,
       }
     );
-
-    if (!product) {
-      return res.status(404).json({
-        message: "Product not found",
-      });
-    }
 
     return res.json({
       message: "Product updated successfully",

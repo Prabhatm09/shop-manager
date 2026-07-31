@@ -1,3 +1,10 @@
+const getTodayInputDate = () => {
+  const today = new Date();
+  const timezoneOffset = today.getTimezoneOffset() * 60000;
+
+  return new Date(today.getTime() - timezoneOffset).toISOString().slice(0, 10);
+};
+
 const CATEGORY_OPTIONS = {
   building_material: ["cement", "balu", "maurang", "gitti", "brick"],
   timber: ["balli", "patra", "caheli", "sandeli", "ladder"],
@@ -29,7 +36,7 @@ const initialPaymentForm = {
   orderId: "",
   amount: "",
   paymentMode: "cash",
-  paymentDate: "",
+  paymentDate: getTodayInputDate(),
   notes: "",
 };
 
@@ -38,4 +45,5 @@ export {
   initialProductForm,
   initialCustomerForm,
   initialPaymentForm,
+  getTodayInputDate,
 };

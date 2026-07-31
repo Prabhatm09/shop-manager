@@ -8,14 +8,17 @@ import {
   Store,
   ShoppingCart,
   IndianRupee,
+  Truck,
   Menu,
   X,
+  UserRound,
 } from "lucide-react";
 
 const AppLayout = ({ children, title, subtitle, headerAction }) => {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const user = JSON.parse(localStorage.getItem("shop_user"));
+  const shopName = user?.shopName || "RM Trader";
 
   const logout = () => {
     localStorage.removeItem("shop_token");
@@ -50,6 +53,11 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
       path: "/payments",
       icon: IndianRupee,
     },
+    {
+      label: "Suppliers",
+      path: "/suppliers",
+      icon: Truck,
+    },
   ];
 
   const sidebarContent = (
@@ -58,12 +66,20 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
         className="flex items-center gap-3 border-b px-6 py-5"
         style={{ borderColor: "var(--shop-border)" }}
       >
-        <div className="brand-mark flex h-12 w-12 items-center justify-center rounded-xl text-white">
-          <Store size={26} />
-        </div>
+        {user?.logoUrl ? (
+          <img
+            src={user.logoUrl}
+            alt=""
+            className="h-12 w-12 rounded-xl object-cover"
+          />
+        ) : (
+          <div className="brand-mark flex h-12 w-12 items-center justify-center rounded-xl text-white">
+            <Store size={26} />
+          </div>
+        )}
 
         <div>
-          <h2 className="text-lg font-black text-slate-900">RM Trader</h2>
+          <h2 className="text-lg font-black text-slate-900">{shopName}</h2>
           <p className="text-xs font-semibold text-slate-500">
             Counter, stock and ledger
           </p>
@@ -102,6 +118,21 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
           </p>
           <p className="text-xs text-slate-500">{user?.email}</p>
         </div>
+
+        <NavLink
+          to="/profile"
+          onClick={() => setMobileMenuOpen(false)}
+          className={({ isActive }) =>
+            `mb-2 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold ${
+              isActive
+                ? "bg-[color:var(--shop-primary-soft)] text-[color:var(--shop-primary-strong)]"
+                : "text-slate-600 hover:bg-[color:var(--shop-panel-2)]"
+            }`
+          }
+        >
+          <UserRound size={18} />
+          Profile
+        </NavLink>
 
         <button
           onClick={logout}
@@ -178,7 +209,7 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
       <nav
         className="mobile-bottom-nav fixed inset-x-0 bottom-0 z-40 border-t px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 lg:hidden"
       >
-        <div className="grid grid-cols-5 gap-1">
+        <div className="grid grid-cols-6 gap-1">
           {navItems.map((item) => {
             const Icon = item.icon;
 

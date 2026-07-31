@@ -14,6 +14,26 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
     },
+    shopName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    shopPhone: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    shopAddress: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    logoUrl: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     password: {
       type: String,
       required: [true, "Password is required"],
