@@ -1,7 +1,11 @@
 import axios from "axios";
 
+const defaultApiUrl = import.meta.env.PROD
+  ? "https://shop-manager-n320.onrender.com/api"
+  : "http://localhost:5000/api";
+
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
+  baseURL: import.meta.env.VITE_API_URL || defaultApiUrl,
 });
 
 API.interceptors.request.use((config) => {

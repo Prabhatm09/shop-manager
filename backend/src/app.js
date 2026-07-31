@@ -10,8 +10,11 @@ const paymentRoutes = require("./routes/payment.routes");
 const supplierRoutes = require("./routes/supplier.routes");
 
 const app = express();
-const allowedOrigins = (process.env.FRONTEND_URL || "")
-  .split(",")
+const defaultFrontendOrigins = ["https://shop-manager-alpha.vercel.app"];
+const allowedOrigins = [
+  ...defaultFrontendOrigins,
+  ...(process.env.FRONTEND_URL || "").split(","),
+]
   .map((origin) => origin.trim())
   .filter(Boolean);
 const isLocalDevOrigin = (origin = "") =>
