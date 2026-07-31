@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Minus, Plus, X } from "lucide-react";
+import { Minus, Plus, Search, ShoppingCart, X } from "lucide-react";
 import API from "../api/axios";
 import LoadingState from "./LoadingState";
+import { AmountDisplay, StatusBadge } from "./pos";
 
 const steps = ["Items", "Customer", "Payment"];
 
@@ -137,6 +138,7 @@ const CreateOrderModal = ({ open, onClose }) => {
 
   const [customers, setCustomers] = useState([]);
   const [customerMode, setCustomerMode] = useState("existing");
+  const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [newCustomer, setNewCustomer] = useState({
     name: "",
@@ -253,6 +255,17 @@ const CreateOrderModal = ({ open, onClose }) => {
       return true;
     });
   }, [products, orderType, search]);
+
+  const filteredCustomers = useMemo(() => {
+    const keyword = customerSearch.toLowerCase();
+
+    return customers.filter(
+      (customer) =>
+        customer.name?.toLowerCase().includes(keyword) ||
+        customer.phone?.toLowerCase().includes(keyword) ||
+        customer.address?.toLowerCase().includes(keyword)
+    );
+  }, [customers, customerSearch]);
 
   const getSelectedItem = (productId) => {
     return selectedItems.find((item) => item.productId === productId);
@@ -702,6 +715,7 @@ const CreateOrderModal = ({ open, onClose }) => {
     });
     setCustomerMode("existing");
     setSelectedCustomerId("");
+    setCustomerSearch("");
     setNewCustomer({
       name: "",
       phone: "",
@@ -737,15 +751,18 @@ const CreateOrderModal = ({ open, onClose }) => {
   if (!open) return null;
 
   return (
-    <div className="mobile-sheet fixed inset-0 z-50 flex bg-black/50 sm:px-4">
-      <div className="modal-panel max-h-[98vh] w-full max-w-6xl overflow-hidden">
-        <div className="flex items-center justify-between border-b px-6 py-4">
+    <div className="fixed inset-0 z-50 bg-slate-100">
+      <div className="flex h-full flex-col overflow-hidden bg-slate-100">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">
-              Create New Order
+            <p className="text-xs font-black uppercase tracking-wide text-amber-700">
+              POS Billing
+            </p>
+            <h2 className="text-xl font-black text-slate-950">
+              New Order
             </h2>
-            <p className="text-sm text-slate-500">
-              Sale, rental, or mixed order
+            <p className="text-sm font-medium text-slate-500">
+              Add material, customer and payment without changing stock rules.
             </p>
           </div>
 
@@ -758,26 +775,26 @@ const CreateOrderModal = ({ open, onClose }) => {
           </button>
         </div>
 
-        <div className="border-b border-slate-200 px-6 py-4">
+        <div className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
             {steps.map((step, index) => (
               <div
                 key={step}
-                className={`rounded-xl px-3 py-3 text-center text-sm font-bold ${
+                className={`rounded-xl border px-3 py-3 text-center text-sm font-black ${
                   index === activeStep
-                    ? "bg-[color:var(--shop-primary)] text-white"
-                    : "bg-slate-100 text-slate-500"
+                    ? "border-slate-800 bg-slate-800 text-white"
+                    : "border-slate-200 bg-slate-50 text-slate-500"
                 }`}
               >
-                Step {index + 1}: {step}
+                {index + 1}. {step}
               </div>
             ))}
           </div>
         </div>
 
-        <div className="max-h-[65vh] overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 pb-28 sm:p-6">
           {message && (
-            <div className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
               {message}
             </div>
           )}
@@ -786,7 +803,7 @@ const CreateOrderModal = ({ open, onClose }) => {
             <LoadingState label="Loading products and customers..." />
           ) : activeStep === 0 && (
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_360px]">
-              <section>
+              <section className="space-y-5">
                 <div className="mb-5 grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
                   {orderTabs.map((tab) => (
                     <button
@@ -807,14 +824,20 @@ const CreateOrderModal = ({ open, onClose }) => {
                   ))}
                 </div>
 
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search product..."
-                  className="mb-5 form-control px-4 py-3"
-                />
+                <div className="relative">
+                  <Search
+                    size={18}
+                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search godown product..."
+                    className="form-control py-3 pl-11 pr-4"
+                  />
+                </div>
 
-                <div className="mb-5 rounded-xl border border-slate-200 bg-[color:var(--shop-panel-2)] p-4">
+                <div className="rounded-2xl border border-purple-200 bg-purple-50 p-4">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
                       <h3 className="text-sm font-black text-slate-900">
@@ -824,9 +847,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                         Use when material is not coming from godown stock.
                       </p>
                     </div>
-                    <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-black text-orange-700">
-                      No stock deduct
-                    </span>
+                    <StatusBadge label="Outsource" tone="outsource" />
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -915,7 +936,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                       return (
                         <div
                           key={product._id}
-                          className="surface-flat p-4"
+                          className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div>
@@ -928,21 +949,16 @@ const CreateOrderModal = ({ open, onClose }) => {
                               </p>
                             </div>
 
-                            <span
-                              className={`rounded-full px-3 py-1 text-xs font-bold ${
-                                isOutOfStock
-                                  ? "bg-red-50 text-red-700"
-                                  : "bg-green-50 text-green-700"
-                              }`}
-                            >
-                              Stock: {product.currentStock || 0}
-                            </span>
+                            <StatusBadge
+                              label={`Stock: ${product.currentStock || 0}`}
+                              tone={isOutOfStock ? "out of stock" : "in stock"}
+                            />
                           </div>
 
                           {!selected ? (
                             <div className="mt-4 flex items-center justify-between">
-                              <p className="text-lg font-bold text-slate-900">
-                                ₹{defaultUnit.pricePerUnit}
+                              <p className="text-lg font-black text-slate-900">
+                                <AmountDisplay amount={defaultUnit.pricePerUnit} />
                                 <span className="text-sm font-medium text-slate-500">
                                   /{defaultUnit.unit}
                                 </span>
@@ -1109,10 +1125,13 @@ const CreateOrderModal = ({ open, onClose }) => {
                 </div>
               </section>
 
-              <aside className="surface-flat xl:sticky xl:top-4 xl:self-start p-5">
-                <h3 className="text-lg font-bold text-slate-900">
+              <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:sticky xl:top-4 xl:self-start">
+                <div className="flex items-center justify-between gap-3">
+                <h3 className="text-lg font-black text-slate-950">
                   Selected Items
                 </h3>
+                <ShoppingCart size={20} className="text-amber-700" />
+                </div>
 
                 <div className="mt-4 space-y-3">
                   {selectedItems.length === 0 ? (
@@ -1123,7 +1142,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                     selectedItems.map((item) => (
                       <div
                         key={item.productId}
-                        className="surface-flat p-4"
+                        className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
                       >
                         <div className="flex justify-between gap-3">
                           <div>
@@ -1134,17 +1153,11 @@ const CreateOrderModal = ({ open, onClose }) => {
                               {item.quantity} {item.selectedUnit} × ₹
                               {item.pricePerUnit}
                             </p>
-                            <span
-                              className={`mt-2 inline-flex rounded-full px-2 py-1 text-[10px] font-black uppercase ${
-                                item.source === "outsourced"
-                                  ? "bg-orange-50 text-orange-700"
-                                  : "bg-green-50 text-green-700"
-                              }`}
-                            >
-                              {item.source === "outsourced"
-                                ? "Outsource"
-                                : "Godown"}
-                            </span>
+                            <StatusBadge
+                              label={item.source === "outsourced" ? "Outsource" : "Godown"}
+                              tone={item.source === "outsourced" ? "outsource" : "godown"}
+                              className="mt-2"
+                            />
                           </div>
 
                           <button
@@ -1164,10 +1177,10 @@ const CreateOrderModal = ({ open, onClose }) => {
                   )}
                 </div>
 
-                <div className="mt-5 bill-panel p-4">
+                <div className="mt-5 rounded-2xl bg-slate-950 p-4 text-white">
                   <div className="flex justify-between">
                     <span>Items Total</span>
-                    <span className="font-bold">₹{itemsTotal}</span>
+                    <span className="font-bold">{formatMoney(itemsTotal)}</span>
                   </div>
                 </div>
               </aside>
@@ -1203,10 +1216,22 @@ const CreateOrderModal = ({ open, onClose }) => {
               </div>
 
               {customerMode === "existing" ? (
-                <div className="surface p-6">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    Select Customer
+                    Search Customer
                   </label>
+                  <div className="relative mb-3">
+                    <Search
+                      size={18}
+                      className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <input
+                      value={customerSearch}
+                      onChange={(e) => setCustomerSearch(e.target.value)}
+                      placeholder="Search by name, phone or address"
+                      className="form-control py-3 pl-11 pr-4"
+                    />
+                  </div>
 
                   <select
                     value={selectedCustomerId}
@@ -1214,7 +1239,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                     className="form-control px-4 py-3"
                   >
                     <option value="">Choose customer</option>
-                    {customers.map((customer) => (
+                    {filteredCustomers.map((customer) => (
                       <option key={customer._id} value={customer._id}>
                         {customer.name} - {customer.phone}
                       </option>
@@ -1239,7 +1264,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                   )}
                 </div>
               ) : (
-                <div className="surface p-6">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="space-y-4">
                     <input
                       name="name"
@@ -1337,8 +1362,8 @@ const CreateOrderModal = ({ open, onClose }) => {
                   </div>
                 )}
 
-                <div className="surface p-5">
-                  <h3 className="mb-4 font-bold text-slate-900">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <h3 className="mb-4 font-black text-slate-950">
                     Payment Details
                   </h3>
 
@@ -1402,14 +1427,14 @@ const CreateOrderModal = ({ open, onClose }) => {
                 </div>
               </section>
 
-              <aside className="surface-flat xl:sticky xl:top-4 xl:self-start p-5">
-                <h3 className="text-lg font-bold text-slate-900">
+              <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:sticky xl:top-4 xl:self-start">
+                <h3 className="text-lg font-black text-slate-950">
                   Order Summary
                 </h3>
 
                 <div className="mt-4 space-y-3">
                   {selectedItems.map((item) => (
-                    <div key={item.productId} className="rounded-xl bg-white p-3">
+                    <div key={item.productId} className="rounded-xl bg-slate-50 p-3">
                       <div className="flex justify-between gap-3 text-sm">
                         <span className="font-semibold text-slate-900">
                           {item.name}
@@ -1426,7 +1451,7 @@ const CreateOrderModal = ({ open, onClose }) => {
                   ))}
                 </div>
 
-                <div className="mt-5 bill-panel p-4">
+                <div className="mt-5 rounded-2xl bg-slate-950 p-4 text-white">
                   <div className="flex justify-between text-sm">
                     <span>Items Total</span>
                     <span className="font-bold">₹{itemsTotal}</span>
@@ -1463,7 +1488,7 @@ const CreateOrderModal = ({ open, onClose }) => {
 
                         <div className="mt-2 flex justify-between text-sm">
                           <span>Total Bill</span>
-                          <span className="font-bold text-blue-300">
+                          <span className="font-bold text-amber-300">
                             ₹{totalPayable}
                           </span>
                         </div>
@@ -1501,7 +1526,10 @@ const CreateOrderModal = ({ open, onClose }) => {
           )}
         </div>
 
-        <div className="thumb-footer flex flex-col-reverse gap-3 border-t border-slate-200 px-4 py-4 sm:flex-row sm:justify-between sm:px-6">
+        <div className="thumb-footer flex flex-col-reverse gap-3 border-t border-slate-200 bg-white px-4 py-4 sm:flex-row sm:justify-between sm:px-6">
+          <div className="hidden text-sm font-bold text-slate-600 sm:block">
+            Total: <span className="text-lg text-slate-950">{formatMoney(totalPayable || grandTotal || itemsTotal)}</span>
+          </div>
           <button
             type="button"
             onClick={() => {

@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Edit, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Edit, Package, Search, Trash2 } from "lucide-react";
 import API from "../api/axios";
 import AppLayout from "../components/AppLayout";
 import LoadingState from "../components/LoadingState";
@@ -8,6 +8,7 @@ import {
   CATEGORY_OPTIONS,
   initialProductForm,
 } from "../constants/forms";
+import { EmptyState, SearchInput, StatCard, StatusBadge } from "../components/pos";
 
 const normalizeSaleUnits = (form) => {
   const saleUnits = (form.saleUnits || [])
@@ -45,6 +46,8 @@ const Products = () => {
   const [stockLoading, setStockLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [stockFilter, setStockFilter] = useState("all");
   const [stockModal, setStockModal] = useState({
     open: false,
     mode: "add",
@@ -64,6 +67,47 @@ const Products = () => {
       setDataLoading(false);
     }
   };
+
+  const getStockStatus = (product) => {
+    const stock = Number(product.currentStock || 0);
+    const alert = Number(product.lowStockAlert || 0);
+
+    if (stock <= 0) return "Out of Stock";
+    if (stock <= alert) return "Low Stock";
+    return "In Stock";
+  };
+
+  const filteredProducts = useMemo(() => {
+    const keyword = search.toLowerCase();
+
+    return products.filter((product) => {
+      const status = getStockStatus(product);
+      const matchesSearch =
+        product.name?.toLowerCase().includes(keyword) ||
+        product.category?.toLowerCase().includes(keyword) ||
+        product.subCategory?.toLowerCase().includes(keyword);
+
+      if (!matchesSearch) return false;
+      if (stockFilter === "low") return status === "Low Stock";
+      if (stockFilter === "out") return status === "Out of Stock";
+      if (stockFilter === "in") return status === "In Stock";
+      return true;
+    });
+  }, [products, search, stockFilter]);
+
+  const stockSummary = useMemo(() => {
+    return products.reduce(
+      (summary, product) => {
+        const status = getStockStatus(product);
+        summary.total += 1;
+        if (status === "Low Stock") summary.low += 1;
+        if (status === "Out of Stock") summary.out += 1;
+        if (status === "In Stock") summary.in += 1;
+        return summary;
+      },
+      { total: 0, in: 0, low: 0, out: 0 }
+    );
+  }, [products]);
 
   useEffect(() => {
     fetchProducts();
@@ -251,23 +295,57 @@ const resetForm = () => {
           {message}
         </div>
       )}
+
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="Products" value={stockSummary.total} icon={Package} />
+        <StatCard label="In Stock" value={stockSummary.in} icon={Package} tone="success" />
+        <StatCard label="Low Stock" value={stockSummary.low} icon={Package} tone="warning" />
+        <StatCard label="Out" value={stockSummary.out} icon={Package} tone="danger" />
+      </div>
+
       <div className="surface p-4 sm:p-6">
         <section>
-          <h2 className="mb-5 text-lg font-bold text-slate-900">
-            Product List
-          </h2>
+          <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-lg font-black text-slate-950">
+                Inventory
+              </h2>
+              <p className="mt-1 text-sm font-medium text-slate-500">
+                Search materials and check stock before billing.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3 lg:w-[34rem] lg:flex-row">
+              <SearchInput
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search product, category..."
+              />
+              <select
+                value={stockFilter}
+                onChange={(e) => setStockFilter(e.target.value)}
+                className="form-control px-4 py-3 lg:w-40"
+              >
+                <option value="all">All Stock</option>
+                <option value="in">In Stock</option>
+                <option value="low">Low Stock</option>
+                <option value="out">Out of Stock</option>
+              </select>
+            </div>
+          </div>
 
           <div className="space-y-3 md:hidden">
             {dataLoading ? (
               <LoadingState label="Loading shop inventory..." />
-            ) : products.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-                No products found. Add your first product.
-              </div>
+            ) : filteredProducts.length === 0 ? (
+              <EmptyState
+                icon={Search}
+                title="No products found"
+                message="Try another search or add a new material."
+              />
             ) : (
-              products.map((product) => {
-                const isLowStock =
-                  (product.currentStock || 0) <= (product.lowStockAlert || 0);
+              filteredProducts.map((product) => {
+                const stockStatus = getStockStatus(product);
 
                 return (
                   <article key={product._id} className="surface-flat p-4">
@@ -280,20 +358,12 @@ const resetForm = () => {
                           {product.category} / {product.subCategory || "-"}
                         </p>
                       </div>
-                      <span
-                        className={`status-pill ${
-                          isLowStock
-                            ? "bg-[color:var(--shop-brick-soft)] text-red-700"
-                            : "bg-[color:var(--shop-primary-soft)] text-green-700"
-                        }`}
-                      >
-                        {isLowStock ? "Low" : "Stock"}
-                      </span>
+                      <StatusBadge label={stockStatus} tone={stockStatus} />
                     </div>
 
                     <div className="mt-4 grid grid-cols-1 gap-2 rounded-xl sm:grid-cols-3 bg-[color:var(--shop-panel-2)] p-3 text-sm">
                       <div>
-                        <p className="text-xs font-bold text-slate-500">Price</p>
+                        <p className="text-xs font-bold text-slate-500">Sale Rate</p>
                         <p className="font-black text-slate-900">₹{product.pricePerUnit}</p>
                       </div>
                       <div>
@@ -311,7 +381,7 @@ const resetForm = () => {
                     <div className="mt-4 grid grid-cols-2 gap-2">
                       <button
                         onClick={() => openStockModal("add", product)}
-                        className="btn-success text-sm"
+                        className="btn-primary text-sm"
                       >
                         + Stock
                       </button>
@@ -362,17 +432,17 @@ const resetForm = () => {
                       <LoadingState label="Loading shop inventory..." />
                     </td>
                   </tr>
-                ) : products.length === 0 ? (
+                ) : filteredProducts.length === 0 ? (
                   <tr>
                     <td
                       colSpan="8"
                       className="px-4 py-8 text-center text-slate-500"
                     >
-                      No products found. Add your first product.
+                      No products found.
                     </td>
                   </tr>
                 ) : (
-                  products.map((product) => (
+                  filteredProducts.map((product) => (
                     <tr
                       key={product._id}
                       className="border-b text-sm hover:bg-slate-50"
@@ -397,15 +467,10 @@ const resetForm = () => {
                         </td>
 
                         <td className="px-4 py-3">
-                        {(product.currentStock || 0) <= (product.lowStockAlert || 0) ? (
-                            <span className="status-pill bg-[color:var(--shop-brick-soft)] text-red-700">
-                            Low Stock
-                            </span>
-                        ) : (
-                            <span className="status-pill bg-[color:var(--shop-primary-soft)] text-green-700">
-                            In Stock
-                            </span>
-                        )}
+                        <StatusBadge
+                          label={getStockStatus(product)}
+                          tone={getStockStatus(product)}
+                        />
                         </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-2">

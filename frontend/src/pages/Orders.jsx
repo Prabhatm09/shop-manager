@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { FileText, Plus, RotateCcw, Search, ShoppingCart, Trash2, X } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import API from "../api/axios";
 import AppLayout from "../components/AppLayout";
+import CreateOrderModal from "../components/CreateOrderModal";
 import LoadingState from "../components/LoadingState";
+import { AmountDisplay, EmptyState, StatCard, StatusBadge } from "../components/pos";
 import getBillNumber from "../utils/billNumber";
 
 const tabs = [
@@ -13,6 +15,7 @@ const tabs = [
   { label: "Due", value: "due" },
   { label: "Paid", value: "paid" },
   { label: "Today", value: "today" },
+  { label: "Returns", value: "returns" },
 ];
 
 const createReturnRow = (orderId = "") => ({
@@ -29,13 +32,19 @@ const createReturnRow = (orderId = "") => ({
 
 const Orders = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [orders, setOrders] = useState([]);
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState(
+    new URLSearchParams(location.search).get("tab") === "returns"
+      ? "returns"
+      : "all"
+  );
   const [search, setSearch] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [returnLoading, setReturnLoading] = useState(false);
+  const [createOrderOpen, setCreateOrderOpen] = useState(false);
   const [returnModal, setReturnModal] = useState({
     open: false,
     order: null,
@@ -59,6 +68,15 @@ const Orders = () => {
     fetchOrders();
   }, []);
 
+  const formatMoney = (amount) =>
+    `₹${Number(amount || 0).toLocaleString("en-IN")}`;
+
+  const getProductId = (item) =>
+    typeof item?.product === "object" ? item.product?._id : item?.product;
+
+  const getReturnEntries = (order) =>
+    (order?.adjustments || []).filter((entry) => entry.type === "return");
+
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       const keyword = search.toLowerCase();
@@ -77,6 +95,7 @@ const Orders = () => {
       if (activeTab === "rental") return order.orderType === "rental";
       if (activeTab === "due") return Number(order.dueAmount || 0) > 0;
       if (activeTab === "paid") return order.paymentStatus === "paid";
+      if (activeTab === "returns") return getReturnEntries(order).length > 0;
       if (activeTab === "today") {
         return (
           new Date(order.createdAt).toDateString() === new Date().toDateString()
@@ -99,21 +118,6 @@ const Orders = () => {
       { count: 0, total: 0, paid: 0, due: 0 }
     );
   }, [filteredOrders]);
-
-  const formatMoney = (amount) =>
-    `₹${Number(amount || 0).toLocaleString("en-IN")}`;
-
-  const getPaymentPillClass = (status) => {
-    if (status === "paid") return "bg-green-50 text-green-700 ring-green-100";
-    if (status === "partial") return "bg-yellow-50 text-yellow-700 ring-yellow-100";
-    return "bg-red-50 text-red-700 ring-red-100";
-  };
-
-  const getProductId = (item) =>
-    typeof item?.product === "object" ? item.product?._id : item?.product;
-
-  const getReturnEntries = (order) =>
-    (order?.adjustments || []).filter((entry) => entry.type === "return");
 
   const getReturnTotal = (order) =>
     getReturnEntries(order).reduce(
@@ -385,7 +389,17 @@ const Orders = () => {
   return (
     <AppLayout
       title="Orders"
-      subtitle="View sale and rental order history"
+      subtitle="Fast billing history, returns and invoice actions"
+      headerAction={
+        <button
+          type="button"
+          onClick={() => setCreateOrderOpen(true)}
+          className="btn-primary w-full md:w-auto"
+        >
+          <Plus size={18} />
+          New Order
+        </button>
+      }
     >
       {message && (
         <div className="mb-5 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
@@ -395,28 +409,10 @@ const Orders = () => {
 
       <div className="surface overflow-hidden">
         <div className="grid grid-cols-2 gap-3 border-b px-5 py-5 md:grid-cols-4" style={{ borderColor: "var(--shop-border)" }}>
-          <div className="rounded-xl border bg-[color:var(--shop-panel)] p-4" style={{ borderColor: "var(--shop-border)" }}>
-            <p className="text-xs font-bold uppercase text-slate-500">Bills</p>
-            <p className="mt-1 text-2xl font-black text-slate-900">{summary.count}</p>
-          </div>
-          <div className="rounded-xl border bg-[color:var(--shop-panel)] p-4" style={{ borderColor: "var(--shop-border)" }}>
-            <p className="text-xs font-bold uppercase text-slate-500">Total</p>
-            <p className="mt-1 text-2xl font-black text-slate-900">
-              {formatMoney(summary.total)}
-            </p>
-          </div>
-          <div className="rounded-xl border bg-[color:var(--shop-panel)] p-4" style={{ borderColor: "var(--shop-border)" }}>
-            <p className="text-xs font-bold uppercase text-slate-500">Paid</p>
-            <p className="mt-1 text-2xl font-black text-green-700">
-              {formatMoney(summary.paid)}
-            </p>
-          </div>
-          <div className="rounded-xl border bg-[color:var(--shop-panel)] p-4" style={{ borderColor: "var(--shop-border)" }}>
-            <p className="text-xs font-bold uppercase text-slate-500">Due</p>
-            <p className="mt-1 text-2xl font-black text-red-700">
-              {formatMoney(summary.due)}
-            </p>
-          </div>
+          <StatCard label="Bills" value={summary.count} icon={ShoppingCart} />
+          <StatCard label="Total" value={formatMoney(summary.total)} icon={FileText} />
+          <StatCard label="Paid" value={formatMoney(summary.paid)} icon={ShoppingCart} tone="success" />
+          <StatCard label="Due" value={formatMoney(summary.due)} icon={ShoppingCart} tone="danger" />
         </div>
 
         <div className="flex flex-col gap-4 border-b px-5 py-5 lg:flex-row lg:items-center lg:justify-between" style={{ borderColor: "var(--shop-border)" }}>
@@ -457,17 +453,21 @@ const Orders = () => {
             <>
           <div className="space-y-3 md:hidden">
             {filteredOrders.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-300 px-5 py-12 text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-[color:var(--shop-primary-soft)] text-[color:var(--shop-primary)]">
-                  <ShoppingCart size={24} />
-                </div>
-                <h3 className="mt-4 text-base font-black text-slate-900">
-                  No orders found
-                </h3>
-                <p className="mt-1 text-sm font-medium text-slate-500">
-                  New sale and rental bills will appear here.
-                </p>
-              </div>
+              <EmptyState
+                icon={ShoppingCart}
+                title="No orders found"
+                message="New sale and rental bills will appear here."
+                action={
+                  <button
+                    type="button"
+                    onClick={() => setCreateOrderOpen(true)}
+                    className="btn-primary"
+                  >
+                    <Plus size={18} />
+                    New Order
+                  </button>
+                }
+              />
             ) : (
               filteredOrders.map((order) => (
                 <article key={order._id} className="surface-flat p-4">
@@ -483,15 +483,10 @@ const Orders = () => {
                         {order.customerPhone}
                       </p>
                     </div>
-                    <span
-                      className={`status-pill ${
-                        order.orderType === "rental"
-                          ? "bg-orange-100 text-orange-700"
-                          : "bg-[color:var(--shop-info-soft)] text-[color:var(--shop-primary-strong)]"
-                      }`}
-                    >
-                      {order.orderType === "rental" ? "Rental" : "Sale"}
-                    </span>
+                    <StatusBadge
+                      label={order.orderType === "rental" ? "Rental" : "Sale"}
+                      tone={order.orderType === "rental" ? "rental" : "sale"}
+                    />
                   </div>
 
                   <div className="mt-4 space-y-1 rounded-xl bg-[color:var(--shop-panel-2)] p-3">
@@ -516,21 +511,15 @@ const Orders = () => {
                   <div className="mt-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
                     <div className="rounded-xl bg-[color:var(--shop-panel-2)] p-3">
                       <p className="text-xs font-bold text-slate-500">Total</p>
-                      <p className="font-black text-slate-900">
-                        {formatMoney(order.subTotal)}
-                      </p>
+                      <AmountDisplay amount={order.subTotal} />
                     </div>
                     <div className="rounded-xl bg-[color:var(--shop-primary-soft)] p-3">
                       <p className="text-xs font-bold text-green-700">Paid</p>
-                      <p className="font-black text-green-800">
-                        {formatMoney(order.paidAmount)}
-                      </p>
+                      <AmountDisplay amount={order.paidAmount} tone="success" />
                     </div>
                     <div className="rounded-xl bg-[color:var(--shop-brick-soft)] p-3">
                       <p className="text-xs font-bold text-red-700">Due</p>
-                      <p className="font-black text-red-800">
-                        {formatMoney(order.dueAmount)}
-                      </p>
+                      <AmountDisplay amount={order.dueAmount} tone="danger" />
                     </div>
                   </div>
 
@@ -680,13 +669,10 @@ const Orders = () => {
                     </td>
 
                     <td className="px-5 py-4">
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1 text-xs font-black capitalize ring-1 ${getPaymentPillClass(
-                          order.paymentStatus
-                        )}`}
-                      >
-                        {order.paymentStatus}
-                      </span>
+                      <StatusBadge
+                        label={order.paymentStatus}
+                        tone={order.paymentStatus}
+                      />
                     </td>
                     <td className="px-5 py-4 text-right">
                       <div className="flex justify-end gap-2">
@@ -1025,6 +1011,10 @@ const Orders = () => {
           </div>
         </div>
       )}
+      <CreateOrderModal
+        open={createOrderOpen}
+        onClose={() => setCreateOrderOpen(false)}
+      />
     </AppLayout>
   );
 };

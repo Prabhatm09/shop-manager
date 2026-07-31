@@ -192,7 +192,7 @@ const Payments = () => {
       label: "Cash Received",
       value: `₹${stats.cashPaid}`,
       icon: Wallet,
-      color: "text-blue-600",
+      color: "text-slate-700",
     },
     {
       label: "UPI Received",

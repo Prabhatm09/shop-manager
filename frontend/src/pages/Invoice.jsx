@@ -283,7 +283,7 @@ const Invoice = () => {
     const ledgerSummary = getLedgerSummary(billOrder);
     const returns = getReturnEntries(billOrder);
     const returnSummary = getReturnSummary(billOrder);
-    const visibleRows = Math.max(items.length, 1);
+    const visibleRows = Math.max(items.length + (returns.length ? 0 : 2), 1);
     const width = 620;
     const rowHeight = 44;
     const billNo = getBillNumber(billOrder);
@@ -294,9 +294,9 @@ const Invoice = () => {
       `${billOrder.customerPhone || "-"} | ${address}`,
       64
     ).slice(0, 2);
-    const customerStartY = 224;
+    const customerStartY = 232;
     const customerAddressY = customerStartY + customerNameLines.length * 20 + 8;
-    const tableTop = customerAddressY + customerAddressLines.length * 16 + 28;
+    const tableTop = customerAddressY + customerAddressLines.length * 16 + 34;
     const tableHeight = 44 + visibleRows * rowHeight;
     const returnsTop = tableTop + tableHeight + 38;
     const returnRowHeight = 34;
@@ -391,12 +391,12 @@ const Invoice = () => {
         const itemText = itemLines
           .map(
             (line, lineIndex) =>
-              `<text x="112" y="${y + 26 + lineIndex * 14}" class="cell strong">${escapeXml(line)}</text>`
+              `<text x="112" y="${y + 26 + lineIndex * 14}" class="cell item-name">${escapeXml(line)}</text>`
           )
           .join("");
 
         return `
-          <text x="62" y="${y + 27}" text-anchor="middle" class="cell">${index + 1}</text>
+          <text x="74" y="${y + 27}" text-anchor="middle" class="cell serial">${index + 1}</text>
           ${itemText}
           <text x="386" y="${y + 27}" text-anchor="end" class="cell">${formatMoney(item.pricePerUnit).replace("Rs. ", "")}</text>
           <text x="446" y="${y + 27}" text-anchor="middle" class="cell">${escapeXml(item.quantity)} ${escapeXml(item.selectedUnit || item.unit)}</text>
@@ -410,7 +410,7 @@ const Invoice = () => {
 
     const tableLines = Array.from({ length: visibleRows + 1 }, (_, index) => {
       const y = tableTop + 44 + index * rowHeight;
-      return `<line x1="36" y1="${y}" x2="584" y2="${y}" class="grid"/>`;
+      return `<line x1="52" y1="${y}" x2="568" y2="${y}" class="grid"/>`;
     }).join("");
 
     const dueAmount = ledgerSummary.hasLedgerContext
@@ -435,7 +435,7 @@ const Invoice = () => {
 
         return `
           <text x="52" y="${y + 22}" class="small">${escapeXml(returnDate)}</text>
-          <text x="144" y="${y + 22}" class="cell strong">${escapeXml(entry.productName || "Return")}</text>
+          <text x="144" y="${y + 22}" class="cell item-name">${escapeXml(entry.productName || "Return")}</text>
           <text x="326" y="${y + 22}" text-anchor="end" class="cell">${formatMoney(entry.returnRate || 0).replace("Rs. ", "")}</text>
           <text x="390" y="${y + 22}" text-anchor="middle" class="cell">${escapeXml(entry.quantity || "")} ${escapeXml(entry.unit || "")}</text>
           <text x="474" y="${y + 22}" text-anchor="end" class="cell">${formatMoney(entry.labourCharge || 0).replace("Rs. ", "")}</text>
@@ -447,7 +447,7 @@ const Invoice = () => {
     const returnLines = returns.length
       ? Array.from({ length: returns.length + 1 }, (_, index) => {
         const y = returnsTop + 40 + index * returnRowHeight;
-        return `<line x1="36" y1="${y}" x2="584" y2="${y}" class="grid"/>`;
+        return `<line x1="52" y1="${y}" x2="568" y2="${y}" class="grid"/>`;
       }).join("")
       : "";
 
@@ -460,7 +460,7 @@ const Invoice = () => {
     const customerAddressText = customerAddressLines
       .map(
         (line, index) =>
-          `<text x="40" y="${customerAddressY + index * 16}" class="small">${escapeXml(line)}</text>`
+          `<text x="52" y="${customerAddressY + index * 16}" class="small">${escapeXml(line)}</text>`
       )
       .join("");
 
@@ -479,50 +479,88 @@ const Invoice = () => {
 
     return `
       <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+        <defs>
+          <filter id="paperNoise" x="0" y="0" width="100%" height="100%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" seed="12" result="noise"/>
+            <feColorMatrix type="saturate" values="0"/>
+            <feComponentTransfer>
+              <feFuncA type="table" tableValues="0 0.045"/>
+            </feComponentTransfer>
+          </filter>
+          <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#1f2937" flood-opacity="0.13"/>
+          </filter>
+          <pattern id="ruled" width="12" height="12" patternUnits="userSpaceOnUse">
+            <path d="M0 11.5 H12" stroke="#eef0e8" stroke-width="0.7"/>
+          </pattern>
+        </defs>
         <style>
-          .shop { font: 900 34px Arial, sans-serif; fill: #101827; letter-spacing: 0.4px; }
-          .estimate { font: 800 15px Arial, sans-serif; fill: #fffdf7; letter-spacing: 1.8px; }
-          .label { font: 800 14px Arial, sans-serif; fill: #667085; letter-spacing: 0.9px; }
-          .body { font: 700 17px Arial, sans-serif; fill: #101827; }
-          .small { font: 600 13px Arial, sans-serif; fill: #667085; }
-          .cell { font: 700 15px Arial, sans-serif; fill: #202a33; }
-          .head { font: 800 13px Arial, sans-serif; fill: #334155; letter-spacing: 1px; }
-          .strong { font-weight: 800; fill: #101827; }
+          .shop { font: 900 27px Arial, sans-serif; fill: #1f3768; letter-spacing: 0.1px; }
+          .estimate { font: 900 13px Arial, sans-serif; fill: #f7faf5; letter-spacing: 1.8px; }
+          .label { font: 900 12.5px Arial, sans-serif; fill: #2b4778; letter-spacing: 1.2px; }
+          .body { font: 700 15.2px Arial, sans-serif; fill: #27364f; }
+          .small { font: 650 12.2px Arial, sans-serif; fill: #526176; }
+          .tiny { font: 700 9.5px Arial, sans-serif; fill: #6f7d91; letter-spacing: 0.55px; }
+          .cell { font: 700 13.6px Arial, sans-serif; fill: #253247; }
+          .item-name { font-weight: 900; fill: #182235; }
+          .serial { fill: #4d5b70; }
+          .head { font: 800 11px Arial, sans-serif; fill: #334155; letter-spacing: 0.9px; }
+          .strong { font-weight: 900; fill: #142034; }
           .muted { fill: #667085; }
-          .grid { stroke: #8993a0; stroke-width: 1; }
-          .paper-edge { stroke: #ded6c6; stroke-width: 1.2; }
+          .grid { stroke: #536070; stroke-width: 0.75; opacity: 0.78; }
+          .paper-edge { stroke: #d8dfdc; stroke-width: 1; }
+          .side-brand { font: 900 20px Arial, sans-serif; fill: #244574; letter-spacing: 1.2px; }
+          .side-small { font: 700 12px Arial, sans-serif; fill: #6a7690; }
+          .logo-dot { fill: #294778; opacity: 0.94; }
         </style>
 
-        <rect width="${width}" height="${height}" fill="#eee8d9"/>
-        <path d="M30 20 H590 V${height - 28} Q590 ${height - 12} 574 ${height - 12} H46 Q30 ${height - 12} 30 ${height - 28} Z" fill="#fffef8" class="paper-edge"/>
-        <path d="M30 20 C42 28 50 12 62 20 C74 28 82 12 94 20 C106 28 114 12 126 20 C138 28 146 12 158 20 C170 28 178 12 190 20 C202 28 210 12 222 20 C234 28 242 12 254 20 C266 28 274 12 286 20 C298 28 306 12 318 20 C330 28 338 12 350 20 C362 28 370 12 382 20 C394 28 402 12 414 20 C426 28 434 12 446 20 C458 28 466 12 478 20 C490 28 498 12 510 20 C522 28 530 12 542 20 C554 28 562 12 574 20 C584 26 590 20 590 20" fill="#eee8d9"/>
+        <rect width="${width}" height="${height}" fill="#e9eef4"/>
+        <path d="M28 18 H592 V${height - 26} Q592 ${height - 10} 576 ${height - 10} H44 Q28 ${height - 10} 28 ${height - 26} Z" fill="#eef4f0" filter="url(#softShadow)" opacity="0.6"/>
+        <path d="M38 20 H582 V${height - 32} Q582 ${height - 20} 570 ${height - 20} H50 Q38 ${height - 20} 38 ${height - 32} Z" fill="#fbfdf7" class="paper-edge"/>
+        <path d="M38 20 C50 25 56 15 68 20 C80 25 86 15 98 20 C110 25 116 15 128 20 C140 25 146 15 158 20 C170 25 176 15 188 20 C200 25 206 15 218 20 C230 25 236 15 248 20 C260 25 266 15 278 20 C290 25 296 15 308 20 C320 25 326 15 338 20 C350 25 356 15 368 20 C380 25 386 15 398 20 C410 25 416 15 428 20 C440 25 446 15 458 20 C470 25 476 15 488 20 C500 25 506 15 518 20 C530 25 536 15 548 20 C560 25 570 20 582 20" fill="#e9eef4"/>
+        <rect x="38" y="24" width="544" height="${height - 58}" fill="url(#ruled)" opacity="0.25"/>
+        <rect x="38" y="24" width="544" height="${height - 58}" filter="url(#paperNoise)"/>
 
-        <rect x="250" y="48" width="120" height="32" rx="4" fill="#26406d"/>
+        <g transform="translate(54 52)">
+          <rect x="0" y="0" width="12" height="12" rx="3" class="logo-dot"/>
+          <rect x="16" y="0" width="12" height="12" rx="3" class="logo-dot"/>
+          <rect x="32" y="0" width="12" height="12" rx="3" class="logo-dot"/>
+          <rect x="0" y="16" width="12" height="12" rx="3" class="logo-dot"/>
+          <rect x="16" y="16" width="12" height="12" rx="3" class="logo-dot"/>
+          <rect x="32" y="16" width="12" height="12" rx="3" class="logo-dot"/>
+        </g>
+        <text x="76" y="${height - 176}" class="side-brand" transform="rotate(-90 76 ${height - 176})">${escapeXml(shopName).slice(0, 22)}</text>
+        <text x="88" y="${height - 176}" class="side-small" transform="rotate(-90 88 ${height - 176})">estimate copy</text>
+
+        <rect x="250" y="56" width="120" height="30" rx="2" fill="#244574"/>
         <text x="310" y="70" text-anchor="middle" class="estimate">ESTIMATE</text>
 
-        <text x="310" y="114" text-anchor="middle" class="shop">${escapeXml(shopName)}</text>
-        <text x="310" y="138" text-anchor="middle" class="small">Building Material Supplier</text>
-        <text x="310" y="158" text-anchor="middle" class="small">${escapeXml(shopPhone ? `${shopAddress} | ${shopPhone}` : shopAddress).slice(0, 72)}</text>
+        <text x="310" y="120" text-anchor="middle" class="shop">${escapeXml(shopName)}</text>
+        <text x="310" y="143" text-anchor="middle" class="small">Building Material Supplier</text>
+        <text x="310" y="162" text-anchor="middle" class="small">${escapeXml(shopPhone ? `${shopAddress} | ${shopPhone}` : shopAddress).slice(0, 72)}</text>
+        <line x1="118" y1="184" x2="568" y2="184" stroke="#a7b1bb" stroke-dasharray="5 7"/>
 
-        <text x="40" y="188" class="small">Bill No: ${billNo}</text>
-        <text x="580" y="188" text-anchor="end" class="body">Date: ${date}</text>
+        <text x="52" y="208" class="small">Bill No: </text>
+        <text x="104" y="208" class="body strong">${billNo}</text>
+        <text x="568" y="208" text-anchor="end" class="body strong">Date: ${date}</text>
 
-        <text x="40" y="${customerStartY}" class="small">To,</text>
-        <line x1="78" y1="${customerStartY + 5}" x2="580" y2="${customerStartY + 5}" stroke="#667085" stroke-dasharray="6 6"/>
+        <text x="52" y="${customerStartY}" class="small">To,</text>
+        <line x1="82" y1="${customerStartY + 5}" x2="568" y2="${customerStartY + 5}" stroke="#8f98a6" stroke-dasharray="7 6"/>
         ${customerNameText}
         ${customerAddressText}
 
-        <text x="36" y="${tableTop - 12}" class="label">MATERIAL GIVEN</text>
-        <rect x="36" y="${tableTop}" width="548" height="${tableHeight}" fill="#fffef8" stroke="#202a33" stroke-width="1.2"/>
-        <line x1="86" y1="${tableTop}" x2="86" y2="${tableTop + tableHeight}" class="grid"/>
-        <line x1="316" y1="${tableTop}" x2="316" y2="${tableTop + tableHeight}" class="grid"/>
+        <text x="52" y="${tableTop - 12}" class="label">MATERIAL GIVEN</text>
+        <rect x="52" y="${tableTop}" width="516" height="${tableHeight}" fill="#fffef8" stroke="#334155" stroke-width="1.35"/>
+        <rect x="52" y="${tableTop}" width="516" height="44" fill="#f3f4eb" opacity="0.8"/>
+        <line x1="96" y1="${tableTop}" x2="96" y2="${tableTop + tableHeight}" class="grid"/>
+        <line x1="318" y1="${tableTop}" x2="318" y2="${tableTop + tableHeight}" class="grid"/>
         <line x1="398" y1="${tableTop}" x2="398" y2="${tableTop + tableHeight}" class="grid"/>
-        <line x1="484" y1="${tableTop}" x2="484" y2="${tableTop + tableHeight}" class="grid"/>
-        <line x1="36" y1="${tableTop + 44}" x2="584" y2="${tableTop + 44}" class="grid"/>
+        <line x1="482" y1="${tableTop}" x2="482" y2="${tableTop + tableHeight}" class="grid"/>
+        <line x1="52" y1="${tableTop + 44}" x2="568" y2="${tableTop + 44}" class="grid"/>
         ${tableLines}
 
-        <text x="62" y="${tableTop + 28}" text-anchor="middle" class="head">Sl</text>
-        <text x="201" y="${tableTop + 28}" text-anchor="middle" class="head">PRODUCT</text>
+        <text x="74" y="${tableTop + 28}" text-anchor="middle" class="head">Sl</text>
+        <text x="207" y="${tableTop + 28}" text-anchor="middle" class="head">PRODUCT</text>
         <text x="357" y="${tableTop + 28}" text-anchor="middle" class="head">RATE</text>
         <text x="441" y="${tableTop + 28}" text-anchor="middle" class="head">QTY</text>
         <text x="534" y="${tableTop + 28}" text-anchor="middle" class="head">AMOUNT</text>
@@ -532,15 +570,15 @@ const Invoice = () => {
         ${
           returns.length
             ? `
-        <text x="36" y="${returnsTop - 12}" class="label">MATERIAL RETURNED</text>
-        <text x="580" y="${returnsTop - 12}" text-anchor="end" class="small">Credit = wapas qty x rate - return labour</text>
-        <rect x="36" y="${returnsTop}" width="548" height="${returnsHeight}" fill="#fffef8" stroke="#202a33" stroke-width="1.2"/>
+        <text x="52" y="${returnsTop - 12}" class="label">MATERIAL RETURNED</text>
+        <text x="568" y="${returnsTop - 12}" text-anchor="end" class="small">Credit = wapas qty x rate - return labour</text>
+        <rect x="52" y="${returnsTop}" width="516" height="${returnsHeight}" fill="#fffef8" stroke="#202a33" stroke-width="1.2"/>
         <line x1="116" y1="${returnsTop}" x2="116" y2="${returnsTop + returnsHeight}" class="grid"/>
         <line x1="276" y1="${returnsTop}" x2="276" y2="${returnsTop + returnsHeight}" class="grid"/>
         <line x1="344" y1="${returnsTop}" x2="344" y2="${returnsTop + returnsHeight}" class="grid"/>
         <line x1="434" y1="${returnsTop}" x2="434" y2="${returnsTop + returnsHeight}" class="grid"/>
         <line x1="492" y1="${returnsTop}" x2="492" y2="${returnsTop + returnsHeight}" class="grid"/>
-        <line x1="36" y1="${returnsTop + 40}" x2="584" y2="${returnsTop + 40}" class="grid"/>
+        <line x1="52" y1="${returnsTop + 40}" x2="568" y2="${returnsTop + 40}" class="grid"/>
         ${returnLines}
         <text x="76" y="${returnsTop + 25}" text-anchor="middle" class="head">DATE</text>
         <text x="196" y="${returnsTop + 25}" text-anchor="middle" class="head">WAPAS ITEM</text>
@@ -573,15 +611,17 @@ const Invoice = () => {
 
         ${
           billOrder.notes
-            ? `<text x="40" y="${notesY}" class="label">NOTE</text>
-               <line x1="88" y1="${notesY - 4}" x2="580" y2="${notesY - 4}" stroke="#667085" stroke-dasharray="6 6"/>
-               <text x="92" y="${notesY - 10}" class="small">${escapeXml(billOrder.notes).slice(0, 72)}</text>`
+            ? `<text x="52" y="${notesY}" class="label">NOTE</text>
+               <line x1="100" y1="${notesY - 4}" x2="568" y2="${notesY - 4}" stroke="#667085" stroke-dasharray="6 6"/>
+               <text x="104" y="${notesY - 10}" class="small">${escapeXml(billOrder.notes).slice(0, 72)}</text>`
             : ""
         }
 
-        <line x1="394" y1="${height - 78}" x2="570" y2="${height - 78}" stroke="#667085"/>
-        <text x="482" y="${height - 56}" text-anchor="middle" class="small">Signature</text>
-        <text x="310" y="${height - 28}" text-anchor="middle" class="small">Thank you for your business</text>
+        <rect x="58" y="${height - 96}" width="172" height="46" rx="4" fill="none" stroke="#d3c7ad" stroke-dasharray="5 5"/>
+        <text x="144" y="${height - 69}" text-anchor="middle" class="tiny">Checked and packed</text>
+        <line x1="394" y1="${height - 82}" x2="552" y2="${height - 82}" stroke="#8f98a6"/>
+        <text x="473" y="${height - 60}" text-anchor="middle" class="small">Authorised Signature</text>
+        <text x="310" y="${height - 30}" text-anchor="middle" class="small">Thank you for your business</text>
       </svg>
     `;
   };
@@ -1079,7 +1119,7 @@ const Invoice = () => {
 
                   <div className="flex justify-between border-b border-slate-200 pb-2">
                     <span className="font-bold text-slate-700">Total Bill</span>
-                    <span className="font-bold text-blue-700">
+                    <span className="font-bold text-amber-700">
                       ₹{ledgerSummary.totalPayable}
                     </span>
                   </div>
@@ -1157,7 +1197,7 @@ const Invoice = () => {
               </button>
             </div>
 
-            <div className="max-h-[68vh] overflow-y-auto bg-[color:var(--shop-panel-2)] p-4 sm:p-6">
+            <div className="max-h-[68vh] overflow-y-auto bg-[#e7edf4] p-4 sm:p-6">
               {billPreview.loading ? (
                 <div className="flex min-h-80 items-center justify-center rounded-xl bg-[color:var(--shop-panel)] text-sm font-bold text-slate-500">
                   Generating bill image...
@@ -1170,7 +1210,7 @@ const Invoice = () => {
                 <img
                   src={billPreview.imageUrl}
                   alt="Bill preview"
-                  className="mx-auto max-h-[58vh] w-auto max-w-full rounded-xl border bg-white object-contain shadow-lg"
+                  className="mx-auto max-h-[58vh] w-auto max-w-full rounded-md border bg-white object-contain shadow-2xl"
                   style={{ borderColor: "var(--shop-border)" }}
                 />
               )}

@@ -443,10 +443,8 @@ const Suppliers = () => {
                         key={panel.value}
                         type="button"
                         onClick={() => setActivePanel(panel.value)}
-                        className={`btn-muted justify-center text-sm ${
-                          activePanel === panel.value
-                            ? "bg-[color:var(--shop-primary)] text-white"
-                            : ""
+                        className={`justify-center text-sm ${
+                          activePanel === panel.value ? "btn-primary" : "btn-muted"
                         }`}
                       >
                         <Icon size={16} />
@@ -460,10 +458,10 @@ const Suppliers = () => {
                       setPaymentForm(createPaymentForm(selectedSupplier._id));
                       setActivePanel("payment");
                     }}
-                    className={`btn-muted justify-center text-sm ${
+                    className={`justify-center text-sm ${
                       activePanel === "payment"
-                        ? "bg-[color:var(--shop-primary)] text-white"
-                        : "text-green-700"
+                        ? "btn-primary"
+                        : "btn-muted text-green-700"
                     }`}
                   >
                     <IndianRupee size={16} />

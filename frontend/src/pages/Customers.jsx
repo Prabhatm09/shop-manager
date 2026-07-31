@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
-import { Edit, Trash2, Eye } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Edit, Search, Trash2, Eye, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import API from "../api/axios";
 import AppLayout from "../components/AppLayout";
 import CustomerFormModal from "../components/CustomerFormModal";
 import LoadingState from "../components/LoadingState";
 import { initialCustomerForm } from "../constants/forms";
+import { EmptyState, SearchInput, StatCard } from "../components/pos";
 
 const Customers = () => {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ const [isModalOpen, setIsModalOpen] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [search, setSearch] = useState("");
 
   const fetchCustomers = async () => {
     try {
@@ -29,6 +31,22 @@ const [isModalOpen, setIsModalOpen] = useState(false);
       setDataLoading(false);
     }
   };
+
+  const filteredCustomers = useMemo(() => {
+    const keyword = search.toLowerCase();
+
+    return customers.filter(
+      (customer) =>
+        customer.name?.toLowerCase().includes(keyword) ||
+        customer.phone?.toLowerCase().includes(keyword) ||
+        customer.address?.toLowerCase().includes(keyword)
+    );
+  }, [customers, search]);
+
+  const totalOpeningDue = customers.reduce(
+    (sum, customer) => sum + Number(customer.openingDue || 0),
+    0
+  );
 
   useEffect(() => {
     fetchCustomers();
@@ -116,23 +134,45 @@ const handleEdit = (customer) => {
           {message}
         </div>
       )}
+
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <StatCard label="Customers" value={customers.length} icon={Users} />
+        <StatCard label="Opening Due" value={`₹${totalOpeningDue}`} icon={Users} tone="danger" />
+        <StatCard label="Showing" value={filteredCustomers.length} icon={Search} />
+      </div>
       
      <div className="surface p-4 sm:p-6">
 
         <section>
-          <h2 className="mb-5 text-lg font-bold text-slate-900">
-            Customer List
-          </h2>
+          <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-lg font-black text-slate-950">
+                Customer Ledger List
+              </h2>
+              <p className="mt-1 text-sm font-medium text-slate-500">
+                Search customers before creating bill or collecting payment.
+              </p>
+            </div>
+            <div className="lg:w-80">
+              <SearchInput
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search customer..."
+              />
+            </div>
+          </div>
 
           <div className="space-y-3 md:hidden">
             {dataLoading ? (
               <LoadingState label="Loading shop customers..." />
-            ) : customers.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-                No customers found. Add your first customer.
-              </div>
+            ) : filteredCustomers.length === 0 ? (
+              <EmptyState
+                icon={Users}
+                title="No customers found"
+                message="Add your first customer or try another search."
+              />
             ) : (
-              customers.map((customer) => (
+              filteredCustomers.map((customer) => (
                 <article key={customer._id} className="surface-flat p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -196,17 +236,17 @@ const handleEdit = (customer) => {
                       <LoadingState label="Loading shop customers..." />
                     </td>
                   </tr>
-                ) : customers.length === 0 ? (
+                ) : filteredCustomers.length === 0 ? (
                   <tr>
                     <td
                       colSpan="5"
                       className="px-4 py-8 text-center text-slate-500"
                     >
-                      No customers found. Add your first customer.
+                      No customers found.
                     </td>
                   </tr>
                 ) : (
-                  customers.map((customer) => (
+                  filteredCustomers.map((customer) => (
                     <tr
                       key={customer._id}
                       className="border-b text-sm hover:bg-slate-50"

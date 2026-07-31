@@ -159,7 +159,7 @@ const CustomerDetail = () => {
     >
       <button
         onClick={() => navigate("/customers")}
-        className="mb-5 flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-blue-600"
+        className="mb-5 flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-amber-700"
       >
         <ArrowLeft size={18} />
         Back to Customers
@@ -183,7 +183,7 @@ const CustomerDetail = () => {
 
               <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
                 <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-4">
-                  <Phone className="text-blue-600" size={20} />
+                  <Phone className="text-amber-700" size={20} />
                   <div>
                     <p className="text-xs text-slate-500">Phone</p>
                     <p className="font-bold text-slate-900">
@@ -352,7 +352,7 @@ const CustomerDetail = () => {
                         <p className="text-xs font-semibold text-slate-500">
                           Total Payable
                         </p>
-                        <p className="mt-1 font-bold text-blue-700">
+                        <p className="mt-1 font-bold text-amber-700">
                           ₹{order.ledger.totalPayable}
                         </p>
                       </div>
