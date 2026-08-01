@@ -22,6 +22,12 @@ const Invoice = () => {
     loading: false,
     error: "",
   });
+  const [billLanguage, setBillLanguage] = useState("en");
+
+  const billLanguageOptions = [
+    { value: "en", label: "English" },
+    { value: "hi", label: "हिंदी" },
+  ];
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -72,6 +78,113 @@ const Invoice = () => {
   };
 
   const formatMoney = (amount) => `Rs. ${Number(amount || 0).toFixed(2)}`;
+
+  const getBillLabels = (language = "en") => {
+    if (language === "hi") {
+      return {
+        estimate: "अनुमान",
+        copy: "ग्राहक कॉपी",
+        sideCopy: "बिल कॉपी",
+        supplierType: "बिल्डिंग मटेरियल सप्लायर",
+        billNo: "बिल नं:",
+        date: "दिनांक:",
+        to: "नाम:",
+        materialGiven: "दिया गया माल",
+        serial: "क्र.",
+        product: "विवरण",
+        rate: "रेट",
+        qty: "मात्रा",
+        amount: "रकम",
+        noItems: "कोई सामान नहीं",
+        materialReturned: "वापस आया माल",
+        returnFormula: "वापसी क्रेडिट मजदूरी काटकर जोड़ा गया है",
+        returnItem: "वापस माल",
+        labour: "मजदूरी",
+        credit: "क्रेडिट",
+        materialGivenTotal: "दिया माल",
+        materialReturnedTotal: "वापस माल",
+        returnLabour: "वापसी मजदूरी",
+        returnCredit: "वापसी क्रेडिट",
+        labourCharge: "मजदूरी चार्ज",
+        lateCharge: "लेट चार्ज",
+        previousDue: "पुराना बकाया",
+        previousAdvance: "पुराना एडवांस",
+        totalBill: "कुल बिल",
+        paidNow: "अभी जमा",
+        remaining: "बाकी",
+        due: "बकाया",
+        customerAdvance: "ग्राहक एडवांस",
+        refund: "रिफंड",
+        note: "नोट",
+        checked: "माल चेक किया",
+        signature: "हस्ताक्षर",
+        thanks: "धन्यवाद",
+        thisBill: "इस बिल",
+        returned: "वापस",
+      };
+    }
+
+    return {
+      estimate: "ESTIMATE",
+      copy: "ORIGINAL CUSTOMER COPY",
+      sideCopy: "estimate copy",
+      supplierType: "Building Material Supplier",
+      billNo: "Bill No:",
+      date: "Date:",
+      to: "To,",
+      materialGiven: "MATERIAL GIVEN",
+      serial: "Sl",
+      product: "DETAILS",
+      rate: "RATE",
+      qty: "QTY",
+      amount: "AMOUNT",
+      noItems: "No items found",
+      materialReturned: "MATERIAL RETURNED",
+      returnFormula: "Return credit is added after labour deduction",
+      returnItem: "RETURN DETAILS",
+      labour: "LABOUR",
+      credit: "CREDIT",
+      materialGivenTotal: "Material Given",
+      materialReturnedTotal: "Material Returned",
+      returnLabour: "Return Labour",
+      returnCredit: "Return Credit",
+      labourCharge: "Labour Charge",
+      lateCharge: "Late Charge",
+      previousDue: "Previous Due",
+      previousAdvance: "Previous Advance",
+      totalBill: "Total Bill",
+      paidNow: "Paid Now",
+      remaining: "Remaining",
+      due: "Due",
+      customerAdvance: "Customer Advance",
+      refund: "Refund",
+      note: "NOTE",
+      checked: "Checked and packed",
+      signature: "Authorised Signature",
+      thanks: "Thank you for your business",
+      thisBill: "This Bill",
+      returned: "Returned",
+    };
+  };
+
+  const translateBillUnit = (unit, language = "en") => {
+    if (language !== "hi") return unit;
+
+    const unitMap = {
+      bag: "बोरी",
+      bags: "बोरी",
+      "half bag": "आधी बोरी",
+      kg: "किलो",
+      feet: "फीट",
+      foot: "फीट",
+      piece: "पीस",
+      pieces: "पीस",
+      pcs: "पीस",
+      trolley: "ट्रॉली",
+    };
+
+    return unitMap[String(unit || "").toLowerCase()] || unit;
+  };
 
   const escapeXml = (value) => {
     return String(value ?? "")
@@ -275,7 +388,8 @@ const Invoice = () => {
     return lines.length ? lines : ["-"];
   };
 
-  const createBillSvg = (billOrder) => {
+  const createBillSvg = (billOrder, language = billLanguage) => {
+    const labels = getBillLabels(language);
     const items = billOrder.items || [];
     const itemTotal = items.reduce((sum, item) => sum + Number(item.total || 0), 0);
     const deliveryCharge = Number(billOrder.deliveryCharge || 0);
@@ -387,7 +501,8 @@ const Invoice = () => {
       ? items
       .map((item, index) => {
         const y = tableTop + 44 + index * rowHeight;
-        const itemLines = wrapText(item.productName, 22).slice(0, 2);
+        const itemDetail = `${item.quantity} ${translateBillUnit(item.selectedUnit || item.unit, language)} ${item.productName}`;
+        const itemLines = wrapText(itemDetail, 34).slice(0, 2);
         const itemText = itemLines
           .map(
             (line, lineIndex) =>
@@ -398,14 +513,12 @@ const Invoice = () => {
         return `
           <text x="74" y="${y + 27}" text-anchor="middle" class="cell serial">${index + 1}</text>
           ${itemText}
-          <text x="386" y="${y + 27}" text-anchor="end" class="cell">${formatMoney(item.pricePerUnit).replace("Rs. ", "")}</text>
-          <text x="446" y="${y + 27}" text-anchor="middle" class="cell">${escapeXml(item.quantity)} ${escapeXml(item.selectedUnit || item.unit)}</text>
           <text x="560" y="${y + 27}" text-anchor="end" class="cell strong">${formatMoney(item.total).replace("Rs. ", "")}</text>
         `;
       })
       .join("")
       : `
-        <text x="310" y="${tableTop + 86}" text-anchor="middle" class="cell muted">No items found</text>
+        <text x="310" y="${tableTop + 86}" text-anchor="middle" class="cell muted">${labels.noItems}</text>
       `;
 
     const tableLines = Array.from({ length: visibleRows + 1 }, (_, index) => {
@@ -430,8 +543,12 @@ const Invoice = () => {
     const returnRows = returns
       .map((entry, index) => {
         const y = returnsTop + 40 + index * returnRowHeight;
-        const returnDate = new Date(entry.createdAt || billOrder.createdAt || Date.now())
-          .toLocaleDateString("en-IN");
+        const returnDateSource =
+          entry.createdAt || billOrder.createdAt || billOrder.updatedAt;
+        const returnDate = returnDateSource
+          ? new Date(returnDateSource).toLocaleDateString("en-IN")
+          : "-";
+        const returnDetail = `${entry.quantity || ""} ${translateBillUnit(entry.unit || "", language)} ${entry.productName || "Return"}`;
 
         return `
           <text x="52" y="${y + 22}" class="small">${escapeXml(returnDate)}</text>
@@ -574,9 +691,7 @@ const Invoice = () => {
         <text x="568" y="${returnsTop - 12}" text-anchor="end" class="small">Credit = wapas qty x rate - return labour</text>
         <rect x="52" y="${returnsTop}" width="516" height="${returnsHeight}" fill="#fffef8" stroke="#202a33" stroke-width="1.2"/>
         <line x1="116" y1="${returnsTop}" x2="116" y2="${returnsTop + returnsHeight}" class="grid"/>
-        <line x1="276" y1="${returnsTop}" x2="276" y2="${returnsTop + returnsHeight}" class="grid"/>
-        <line x1="344" y1="${returnsTop}" x2="344" y2="${returnsTop + returnsHeight}" class="grid"/>
-        <line x1="434" y1="${returnsTop}" x2="434" y2="${returnsTop + returnsHeight}" class="grid"/>
+        <line x1="398" y1="${returnsTop}" x2="398" y2="${returnsTop + returnsHeight}" class="grid"/>
         <line x1="492" y1="${returnsTop}" x2="492" y2="${returnsTop + returnsHeight}" class="grid"/>
         <line x1="52" y1="${returnsTop + 40}" x2="568" y2="${returnsTop + 40}" class="grid"/>
         ${returnLines}
@@ -626,7 +741,7 @@ const Invoice = () => {
     `;
   };
 
-  const generateBillImage = async () => {
+  const generateBillImage = async (language = billLanguage) => {
     if (!order) return null;
 
     const validationError = getBillValidationError(order);
@@ -634,7 +749,7 @@ const Invoice = () => {
       throw new Error(validationError);
     }
 
-    const svg = createBillSvg(order);
+    const svg = createBillSvg(order, language);
     const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
     const svgUrl = URL.createObjectURL(svgBlob);
 
@@ -673,7 +788,7 @@ const Invoice = () => {
     }
   };
 
-  const openBillPreview = async () => {
+  const openBillPreview = async (language = billLanguage) => {
     try {
       const validationError = getBillValidationError(order);
       if (validationError) {
@@ -699,7 +814,7 @@ const Invoice = () => {
         error: "",
       });
 
-      const result = await generateBillImage();
+      const result = await generateBillImage(language);
 
       if (!result) {
         throw new Error("Order is not ready");
@@ -723,6 +838,14 @@ const Invoice = () => {
     }
   };
 
+  const handleBillLanguageChange = async (language) => {
+    setBillLanguage(language);
+
+    if (billPreview.open) {
+      await openBillPreview(language);
+    }
+  };
+
   const closeBillPreview = () => {
     if (billPreview.imageUrl) {
       URL.revokeObjectURL(billPreview.imageUrl);
@@ -742,7 +865,7 @@ const Invoice = () => {
 
     const link = document.createElement("a");
     link.href = billPreview.imageUrl;
-    link.download = `rm-trader-bill-${getBillNumber(order)}.png`;
+    link.download = `rm-trader-bill-${getBillNumber(order)}-${billLanguage}.png`;
     link.click();
   };
 
@@ -758,7 +881,7 @@ const Invoice = () => {
 
     const file = new File(
       [billPreview.blob],
-      `rm-trader-bill-${getBillNumber(order)}.png`,
+      `rm-trader-bill-${getBillNumber(order)}-${billLanguage}.png`,
       { type: "image/png" }
     );
 
@@ -858,9 +981,26 @@ const Invoice = () => {
             Back
           </button>
 
-          <div className="grid grid-cols-2 gap-2 sm:flex">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+            <div className="col-span-2 grid grid-cols-2 rounded-xl border bg-white p-1 shadow-sm sm:col-span-1" style={{ borderColor: "var(--shop-border)" }}>
+              {billLanguageOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handleBillLanguageChange(option.value)}
+                  className={`rounded-lg px-3 py-2 text-sm font-black transition ${
+                    billLanguage === option.value
+                      ? "bg-[color:var(--shop-primary)] text-white"
+                      : "text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
             <button
-              onClick={openBillPreview}
+              onClick={() => openBillPreview()}
               className="btn-success"
             >
               <Share2 size={18} />
@@ -939,14 +1079,7 @@ const Invoice = () => {
             <thead>
               <tr className="bg-slate-100 text-left text-sm text-slate-700">
                 <th className="border border-slate-300 px-4 py-3">#</th>
-                <th className="border border-slate-300 px-4 py-3">Item</th>
-                <th className="border border-slate-300 px-4 py-3">Unit</th>
-                <th className="border border-slate-300 px-4 py-3 sm:text-right">
-                  Qty
-                </th>
-                <th className="border border-slate-300 px-4 py-3 sm:text-right">
-                  Rate
-                </th>
+                <th className="border border-slate-300 px-4 py-3">Details</th>
                 <th className="border border-slate-300 px-4 py-3 sm:text-right">
                   Total
                 </th>
@@ -960,16 +1093,7 @@ const Invoice = () => {
                     {index + 1}
                   </td>
                   <td className="border border-slate-300 px-4 py-3 font-semibold">
-                    {item.productName}
-                  </td>
-                  <td className="border border-slate-300 px-4 py-3 capitalize">
-                    {item.selectedUnit || item.unit}
-                  </td>
-                  <td className="border border-slate-300 px-4 py-3 sm:text-right">
-                    {item.quantity}
-                  </td>
-                  <td className="border border-slate-300 px-4 py-3 sm:text-right">
-                    ₹{item.pricePerUnit}
+                    {item.quantity} {item.selectedUnit || item.unit} {item.productName}
                   </td>
                   <td className="border border-slate-300 px-4 py-3 sm:text-right font-semibold">
                     ₹{item.total}
@@ -991,7 +1115,7 @@ const Invoice = () => {
               </div>
 
               <div className="mt-2 overflow-x-auto">
-                <table className="w-full min-w-[720px] border-collapse">
+                <table className="w-full min-w-[560px] border-collapse">
                   <thead>
                     <tr className="bg-orange-50 text-left text-sm text-slate-700">
                       <th className="border border-slate-300 px-4 py-3">Date</th>
@@ -1184,7 +1308,7 @@ const Invoice = () => {
                   Bill Draft Preview
                 </h2>
                 <p className="mt-1 text-sm font-semibold text-slate-500">
-                  Check the bill image before sending to customer.
+                  Choose Hindi or English before sending to customer.
                 </p>
               </div>
 
