@@ -26,6 +26,17 @@ const supplierSchema = new mongoose.Schema(
       trim: true,
     },
 
+    openingBalance: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    openingBalanceDate: {
+      type: Date,
+      default: null,
+    },
+
     isActive: {
       type: Boolean,
       default: true,

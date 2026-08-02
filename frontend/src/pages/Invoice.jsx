@@ -401,7 +401,10 @@ const Invoice = () => {
     const width = 620;
     const rowHeight = 44;
     const billNo = getBillNumber(billOrder);
-    const date = new Date(billOrder.createdAt || Date.now()).toLocaleDateString("en-IN");
+    const billDateSource = billOrder.createdAt || billOrder.updatedAt;
+    const date = billDateSource
+      ? new Date(billDateSource).toLocaleDateString("en-IN")
+      : "-";
     const address = billOrder.deliveryAddress || billOrder.customer?.address || "-";
     const customerNameLines = wrapText(billOrder.customerName || "-", 34).slice(0, 2);
     const customerAddressLines = wrapText(
@@ -548,7 +551,6 @@ const Invoice = () => {
         const returnDate = returnDateSource
           ? new Date(returnDateSource).toLocaleDateString("en-IN")
           : "-";
-        const returnDetail = `${entry.quantity || ""} ${translateBillUnit(entry.unit || "", language)} ${entry.productName || "Return"}`;
 
         return `
           <text x="52" y="${y + 22}" class="small">${escapeXml(returnDate)}</text>

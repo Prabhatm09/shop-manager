@@ -6,6 +6,12 @@ const StockMovement = require("../models/StockMovement");
 
 const isFiniteNumber = (value) => Number.isFinite(Number(value));
 
+const normalizeOpeningBalance = (openingBalance) => {
+  const amount = Number(openingBalance || 0);
+
+  return Number.isFinite(amount) ? amount : NaN;
+};
+
 const getSupplierSummaries = async (userId) => {
   const [suppliers, transactions, payments] = await Promise.all([
     Supplier.find({ createdBy: userId, isActive: true }).sort({ createdAt: -1 }),
@@ -36,14 +42,18 @@ const getSupplierSummaries = async (userId) => {
   return suppliers.map((supplier) => {
     const totalSupplied = Number(transactionBySupplier.get(supplier._id.toString()) || 0);
     const totalPaid = Number(paymentBySupplier.get(supplier._id.toString()) || 0);
+    const openingBalance = Number(supplier.openingBalance || 0);
+    const totalPayable = openingBalance + totalSupplied;
 
     return {
       ...supplier.toObject(),
       summary: {
+        openingBalance,
         totalSupplied,
+        totalPayable,
         totalPaid,
-        dueAmount: Math.max(totalSupplied - totalPaid, 0),
-        advanceAmount: Math.max(totalPaid - totalSupplied, 0),
+        dueAmount: Math.max(totalPayable - totalPaid, 0),
+        advanceAmount: Math.max(totalPaid - totalPayable, 0),
       },
     };
   });
@@ -67,11 +77,25 @@ const getSuppliers = async (req, res) => {
 
 const createSupplier = async (req, res) => {
   try {
-    const { name, phone = "", address = "", notes = "" } = req.body;
+    const {
+      name,
+      phone = "",
+      address = "",
+      notes = "",
+      openingBalance = 0,
+      openingBalanceDate,
+    } = req.body;
+    const finalOpeningBalance = normalizeOpeningBalance(openingBalance);
 
     if (!name?.trim()) {
       return res.status(400).json({
         message: "Supplier name is required",
+      });
+    }
+
+    if (!Number.isFinite(finalOpeningBalance) || finalOpeningBalance < 0) {
+      return res.status(400).json({
+        message: "Opening balance cannot be negative",
       });
     }
 
@@ -80,6 +104,9 @@ const createSupplier = async (req, res) => {
       phone,
       address,
       notes,
+      openingBalance: finalOpeningBalance,
+      openingBalanceDate:
+        finalOpeningBalance > 0 ? openingBalanceDate || new Date() : null,
       createdBy: req.user._id,
     });
 
@@ -97,17 +124,41 @@ const createSupplier = async (req, res) => {
 
 const updateSupplier = async (req, res) => {
   try {
+    const hasOpeningBalanceUpdate = req.body.openingBalance !== undefined;
+    const finalOpeningBalance = hasOpeningBalanceUpdate
+      ? normalizeOpeningBalance(req.body.openingBalance)
+      : null;
+
+    if (
+      hasOpeningBalanceUpdate &&
+      (!Number.isFinite(finalOpeningBalance) || finalOpeningBalance < 0)
+    ) {
+      return res.status(400).json({
+        message: "Opening balance cannot be negative",
+      });
+    }
+
+    const updatePayload = {
+      name: req.body.name,
+      phone: req.body.phone,
+      address: req.body.address,
+      notes: req.body.notes,
+    };
+
+    if (hasOpeningBalanceUpdate) {
+      updatePayload.openingBalance = finalOpeningBalance;
+      updatePayload.openingBalanceDate =
+        finalOpeningBalance > 0
+          ? req.body.openingBalanceDate || new Date()
+          : null;
+    }
+
     const supplier = await Supplier.findOneAndUpdate(
       {
         _id: req.params.id,
         createdBy: req.user._id,
       },
-      {
-        name: req.body.name,
-        phone: req.body.phone,
-        address: req.body.address,
-        notes: req.body.notes,
-      },
+      updatePayload,
       {
         new: true,
         runValidators: true,
@@ -475,14 +526,18 @@ const getSupplierLedger = async (req, res) => {
       (sum, payment) => sum + Number(payment.amount || 0),
       0
     );
+    const openingBalance = Number(supplier.openingBalance || 0);
+    const totalPayable = openingBalance + totalSupplied;
 
     return res.json({
       supplier,
       summary: {
+        openingBalance,
         totalSupplied,
+        totalPayable,
         totalPaid,
-        dueAmount: Math.max(totalSupplied - totalPaid, 0),
-        advanceAmount: Math.max(totalPaid - totalSupplied, 0),
+        dueAmount: Math.max(totalPayable - totalPaid, 0),
+        advanceAmount: Math.max(totalPaid - totalPayable, 0),
       },
       transactions,
       payments,

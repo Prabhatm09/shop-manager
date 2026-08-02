@@ -10,6 +10,8 @@ const initialSupplierForm = {
   name: "",
   phone: "",
   address: "",
+  openingBalance: "",
+  openingBalanceDate: today(),
   notes: "",
 };
 
@@ -141,6 +143,10 @@ const Suppliers = () => {
       name: supplier.name || "",
       phone: supplier.phone || "",
       address: supplier.address || "",
+      openingBalance: supplier.openingBalance || "",
+      openingBalanceDate: supplier.openingBalanceDate
+        ? new Date(supplier.openingBalanceDate).toISOString().slice(0, 10)
+        : today(),
       notes: supplier.notes || "",
     });
     setSupplierModalOpen(true);
@@ -154,15 +160,28 @@ const Suppliers = () => {
       return;
     }
 
+    const openingBalance = Number(supplierForm.openingBalance || 0);
+
+    if (!Number.isFinite(openingBalance) || openingBalance < 0) {
+      setMessage("Opening balance cannot be negative");
+      return;
+    }
+
     try {
       setSaving(true);
       setMessage("");
+      const supplierPayload = {
+        ...supplierForm,
+        openingBalance,
+        openingBalanceDate:
+          openingBalance > 0 ? supplierForm.openingBalanceDate : "",
+      };
 
       if (editingId) {
-        await API.put(`/suppliers/${editingId}`, supplierForm);
+        await API.put(`/suppliers/${editingId}`, supplierPayload);
         setMessage("Supplier updated");
       } else {
-        const res = await API.post("/suppliers", supplierForm);
+        const res = await API.post("/suppliers", supplierPayload);
         setSelectedSupplierId(res.data.supplier?._id || "");
         setMessage("Supplier added");
       }
@@ -1015,6 +1034,40 @@ const Suppliers = () => {
                     className="form-control resize-none px-4 py-3"
                     placeholder="Example: Main market, near depot"
                   />
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="field-label">Old Pending Balance</label>
+                    <input
+                      inputMode="decimal"
+                      value={supplierForm.openingBalance}
+                      onChange={(e) =>
+                        setSupplierForm({
+                          ...supplierForm,
+                          openingBalance: e.target.value.replace(/[^\d.]/g, ""),
+                        })
+                      }
+                      className="form-control px-4 py-3"
+                      placeholder="Optional, example: 1140"
+                    />
+                    <p className="mt-1 text-xs font-semibold text-slate-500">
+                      Old diary pending amount payable to this supplier.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="field-label">Pending Since</label>
+                    <input
+                      type="date"
+                      value={supplierForm.openingBalanceDate}
+                      onChange={(e) =>
+                        setSupplierForm({
+                          ...supplierForm,
+                          openingBalanceDate: e.target.value,
+                        })
+                      }
+                      className="form-control px-4 py-3"
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="field-label">Notes</label>
