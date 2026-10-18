@@ -20,6 +20,7 @@ const tabs = [
 
 const createReturnRow = (orderId = "") => ({
   orderId,
+  itemIndex: "",
   productId: "",
   quantity: "",
   unit: "",
@@ -44,7 +45,9 @@ const Orders = () => {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [returnLoading, setReturnLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [createOrderOpen, setCreateOrderOpen] = useState(false);
+  const [deleteModal, setDeleteModal] = useState({ open: false, order: null });
   const [returnModal, setReturnModal] = useState({
     open: false,
     order: null,
@@ -91,8 +94,8 @@ const Orders = () => {
 
       if (!matchesSearch) return false;
 
-      if (activeTab === "sale") return order.orderType !== "rental";
-      if (activeTab === "rental") return order.orderType === "rental";
+      if (activeTab === "sale") return order.orderType === "sale" || order.orderType === "mixed";
+      if (activeTab === "rental") return order.orderType === "rental" || order.orderType === "mixed";
       if (activeTab === "due") return Number(order.dueAmount || 0) > 0;
       if (activeTab === "paid") return order.paymentStatus === "paid";
       if (activeTab === "returns") return getReturnEntries(order).length > 0;
@@ -125,12 +128,19 @@ const Orders = () => {
       0
     );
 
-  const getReturnedBaseQuantity = (order, productId) =>
+  const getReturnedBaseQuantity = (order, item) =>
     getReturnEntries(order)
       .filter((entry) => {
+        if (!item) return false;
+        const productId = getProductId(item);
         const entryProductId =
           typeof entry.product === "object" ? entry.product?._id : entry.product;
-        return entryProductId === productId;
+        if (productId) return entryProductId === productId;
+        return (
+          !entry.product &&
+          entry.productName === item.productName &&
+          (!entry.unit || entry.unit === (item.selectedUnit || item.unit))
+        );
       })
       .reduce(
         (sum, entry) =>
@@ -139,22 +149,16 @@ const Orders = () => {
         0
       );
 
-  const getPurchasedBaseQuantity = (order, productId) =>
-    (order?.items || [])
-      .filter((item) => getProductId(item) === productId)
-      .reduce(
-        (sum, item) =>
-          sum + Number(item.quantity || 0) * Number(item.conversionToBase || 1),
-        0
-      );
+  const getPurchasedBaseQuantity = (item) =>
+    Number(item?.quantity || 0) * Number(item?.conversionToBase || 1);
 
   const getSelectedReturnOrder = (row) =>
     returnModal.customerOrders.find((order) => order._id === row.orderId);
 
   const getSelectedReturnItem = (row) =>
-    getSelectedReturnOrder(row)?.items?.find(
-      (item) => getProductId(item) === row.productId
-    );
+    row.itemIndex === ""
+      ? null
+      : getSelectedReturnOrder(row)?.items?.[Number(row.itemIndex)];
 
   const getUnitOptions = (item) => {
     if (!item) return [];
@@ -235,6 +239,32 @@ const Orders = () => {
     });
   };
 
+  const openDeleteModal = (order) => {
+    setMessage("");
+    setDeleteModal({ open: true, order });
+  };
+
+  const closeDeleteModal = () => {
+    if (deleteLoading) return;
+    setDeleteModal({ open: false, order: null });
+  };
+
+  const handleDeleteOrder = async () => {
+    if (!deleteModal.order) return;
+
+    try {
+      setDeleteLoading(true);
+      await API.delete(`/orders/${deleteModal.order._id}`);
+      setDeleteModal({ open: false, order: null });
+      setMessage("Order deleted successfully");
+      await fetchOrders();
+    } catch (error) {
+      setMessage(error.response?.data?.message || "Order delete failed");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   const updateReturnRow = (index, patch) => {
     setReturnModal({
       ...returnModal,
@@ -264,22 +294,53 @@ const Orders = () => {
     });
   };
 
-  const handleReturnItemChange = (index, productId) => {
+  const handleReturnItemChange = (index, itemIndex) => {
     const row = returnModal.rows[index];
     const order = getSelectedReturnOrder(row);
-    const item = order?.items?.find(
-      (orderItem) => getProductId(orderItem) === productId
-    );
+    const item = order?.items?.[Number(itemIndex)];
     const unitOption = getUnitOptions(item)[0];
 
     updateReturnRow(index, {
-      productId,
-      quantity: "",
+      itemIndex: String(itemIndex),
+      productId: getProductId(item) || "",
+      quantity: String(item?.quantity || ""),
       unit: unitOption?.unit || item?.selectedUnit || item?.unit || "",
       conversionToBase: String(unitOption?.conversionToBase || 1),
       returnRate: String(unitOption?.pricePerUnit || item?.pricePerUnit || ""),
       labourCharge: "",
+      stockImpact: getProductId(item) ? row.stockImpact : "no_stock_change",
     });
+  };
+
+  const fillFullReturn = () => {
+    const order = returnModal.order;
+    if (!order) return;
+
+    const rows = (order.items || [])
+      .map((item, itemIndex) => ({ item, itemIndex }))
+      .filter(({ item }) => item.itemType === "rental" || !item.itemType)
+      .map(({ item, itemIndex }) => {
+      const unitOption = getUnitOptions(item)[0];
+      const conversionToBase = Number(unitOption?.conversionToBase || item.conversionToBase || 1);
+      const remainingBase = Math.max(
+        getPurchasedBaseQuantity(item) - getReturnedBaseQuantity(order, item),
+        0
+      );
+
+      return {
+        ...createReturnRow(order._id),
+        itemIndex: String(itemIndex),
+        productId: getProductId(item) || "",
+        quantity: String(remainingBase / conversionToBase || ""),
+        unit: unitOption?.unit || item.selectedUnit || item.unit || "",
+        conversionToBase: String(conversionToBase),
+        returnRate: String(unitOption?.pricePerUnit || item.pricePerUnit || ""),
+        stockImpact: getProductId(item) ? "add_to_stock" : "no_stock_change",
+      };
+      })
+      .filter((row) => Number(row.quantity) > 0);
+
+    setReturnModal({ ...returnModal, rows });
   };
 
   const handleReturnUnitChange = (index, unit) => {
@@ -310,8 +371,9 @@ const Orders = () => {
       const labourCharge = Number(row.labourCharge || 0);
       const conversionToBase = Number(row.conversionToBase || 1);
       const credit = Math.max(quantity * returnRate - labourCharge, 0);
+      const selectedItem = getSelectedReturnItem(row);
 
-      if (!rowOrder || !row.productId) {
+      if (!rowOrder || !selectedItem || row.itemIndex === "") {
         setMessage(`Choose bill and item for return row ${rowNumber}`);
         return;
       }
@@ -341,8 +403,8 @@ const Orders = () => {
         return;
       }
 
-      const purchasedBase = getPurchasedBaseQuantity(rowOrder, row.productId);
-      const returnedBase = getReturnedBaseQuantity(rowOrder, row.productId);
+      const purchasedBase = getPurchasedBaseQuantity(selectedItem);
+      const returnedBase = getReturnedBaseQuantity(rowOrder, selectedItem);
 
       if (quantity * conversionToBase > purchasedBase - returnedBase + 0.0001) {
         setMessage(
@@ -360,10 +422,12 @@ const Orders = () => {
         const quantity = Number(row.quantity);
         const returnRate = Number(row.returnRate);
         const labourCharge = Number(row.labourCharge || 0);
+        const selectedItem = getSelectedReturnItem(row);
 
         await API.post(`/orders/${row.orderId}/adjustments`, {
           type: "return",
-          productId: row.productId,
+          productId: getProductId(selectedItem) || undefined,
+          productName: selectedItem?.productName || "",
           quantity,
           unit: row.unit,
           conversionToBase: Number(row.conversionToBase || 1),
@@ -484,8 +548,8 @@ const Orders = () => {
                       </p>
                     </div>
                     <StatusBadge
-                      label={order.orderType === "rental" ? "Rental" : "Sale"}
-                      tone={order.orderType === "rental" ? "rental" : "sale"}
+                      label={order.orderType === "mixed" ? "Mixed" : order.orderType === "rental" ? "Rental" : "Sale"}
+                      tone={order.orderType === "mixed" ? "partial" : order.orderType === "rental" ? "rental" : "sale"}
                     />
                   </div>
 
@@ -523,7 +587,7 @@ const Orders = () => {
                     </div>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-1 gap-2">
+                  <div className="mt-4 grid grid-cols-2 gap-2">
                     <button
                       onClick={() => openReturnModal(order)}
                       className="btn-muted w-full text-sm text-orange-700"
@@ -532,8 +596,16 @@ const Orders = () => {
                       Return
                     </button>
                     <button
+                      onClick={() => openDeleteModal(order)}
+                      className="btn-muted w-full p-3 text-red-700"
+                      title="Delete order"
+                      aria-label="Delete order"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                    <button
                       onClick={() => navigate(`/orders/${order._id}/invoice`)}
-                      className="btn-success w-full text-sm"
+                      className="btn-success col-span-2 w-full text-sm"
                     >
                       <FileText size={16} />
                       Open Bill
@@ -610,7 +682,7 @@ const Orders = () => {
                             {order.customerName}
                           </p>
                           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black uppercase text-slate-500">
-                            {order.orderType === "rental" ? "Rental" : "Sale"}
+                            {order.orderType === "mixed" ? "Mixed" : order.orderType === "rental" ? "Rental" : "Sale"}
                           </span>
                         </div>
                         <p className="mt-1 text-sm font-semibold text-slate-500">
@@ -674,8 +746,16 @@ const Orders = () => {
                         tone={order.paymentStatus}
                       />
                     </td>
-                    <td className="px-5 py-4 text-right">
-                      <div className="flex justify-end gap-2">
+                    <td className="sticky right-0 z-10 bg-white px-5 py-4 text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)]">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <button
+                          onClick={() => openDeleteModal(order)}
+                          className="btn-muted p-3 text-red-700"
+                          title="Delete order"
+                          aria-label="Delete order"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                         <button
                           onClick={() => openReturnModal(order)}
                           className="btn-muted text-sm text-orange-700"
@@ -717,21 +797,31 @@ const Orders = () => {
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={closeReturnModal}
-                disabled={returnLoading}
-                className="btn-muted p-2"
-              >
-                <X size={20} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={fillFullReturn}
+                  disabled={returnLoading}
+                  className="btn-muted text-xs text-orange-700"
+                >
+                  Return full bill
+                </button>
+                <button
+                  type="button"
+                  onClick={closeReturnModal}
+                  disabled={returnLoading}
+                  className="btn-muted p-2"
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             <form onSubmit={handleReturnSubmit}>
               <div className="max-h-[68vh] space-y-4 overflow-y-auto p-4 sm:p-6">
                 <div className="rounded-xl bg-[color:var(--shop-panel-2)] p-4">
                   <p className="text-sm font-bold text-slate-900">
-                    Add every returned material line here, even when it belongs to another bill for this customer.
+                    Choose one or more items from this bill. Use the full quantity for a complete return or reduce it for a partial return.
                   </p>
                   <p className="mt-1 text-xs font-semibold text-slate-500">
                     Each row is saved against its selected bill, so stock and bill balance stay separate.
@@ -747,9 +837,9 @@ const Orders = () => {
                     const rowLabour = Number(row.labourCharge || 0);
                     const rowCredit = Math.max(rowGross - rowLabour, 0);
                     const remainingBase =
-                      selectedOrder && row.productId
-                        ? getPurchasedBaseQuantity(selectedOrder, row.productId) -
-                          getReturnedBaseQuantity(selectedOrder, row.productId)
+                      selectedOrder && selectedItem
+                        ? getPurchasedBaseQuantity(selectedItem) -
+                          getReturnedBaseQuantity(selectedOrder, selectedItem)
                         : 0;
 
                     return (
@@ -797,17 +887,20 @@ const Orders = () => {
                           <div>
                             <label className="field-label">Returned Item</label>
                             <select
-                              value={row.productId}
+                              value={row.itemIndex}
                               onChange={(e) =>
                                 handleReturnItemChange(index, e.target.value)
                               }
                               className="form-control px-4 py-3"
                             >
                               <option value="">Choose purchased item</option>
-                              {selectedOrder?.items?.map((item, itemIndex) => (
+                              {selectedOrder?.items
+                                ?.map((item, itemIndex) => ({ item, itemIndex }))
+                                .filter(({ item }) => item.itemType === "rental" || !item.itemType)
+                                .map(({ item, itemIndex }) => (
                                 <option
-                                  key={`${getProductId(item)}-${itemIndex}`}
-                                  value={getProductId(item)}
+                                  key={`${selectedOrder._id}-${itemIndex}`}
+                                  value={itemIndex}
                                 >
                                   {item.productName} · bought {item.quantity}{" "}
                                   {item.selectedUnit || item.unit} at{" "}
@@ -999,7 +1092,7 @@ const Orders = () => {
                   disabled={
                     returnLoading ||
                     returnModal.rows.some(
-                      (row) => !row.orderId || !row.productId || !row.quantity || !row.returnRate
+                      (row) => !row.orderId || row.itemIndex === "" || !row.quantity || !row.returnRate
                     )
                   }
                   className="btn-success"
@@ -1008,6 +1101,52 @@ const Orders = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {deleteModal.open && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+          <div className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">Delete order?</h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  {getBillNumber(deleteModal.order)} · {deleteModal.order?.customerName}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeDeleteModal}
+                disabled={deleteLoading}
+                className="btn-muted p-2"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mt-5 rounded-xl bg-red-50 p-4 text-sm font-semibold text-red-800">
+              This permanently removes the bill, its payments, returns, and linked stock movement. Use this only for a wrongly created order.
+            </div>
+
+            <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={closeDeleteModal}
+                disabled={deleteLoading}
+                className="btn-muted"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteOrder}
+                disabled={deleteLoading}
+                className="btn-danger"
+              >
+                <Trash2 size={16} />
+                {deleteLoading ? "Deleting..." : "Delete permanently"}
+              </button>
+            </div>
           </div>
         </div>
       )}

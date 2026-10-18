@@ -7,6 +7,7 @@ import {
   ShoppingCart,
   Users,
   WalletCards,
+  X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import API from "../api/axios";
@@ -27,6 +28,9 @@ const Dashboard = () => {
   const [orders, setOrders] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [returnConfirm, setReturnConfirm] = useState({ open: false, order: null });
+  const [returnSubmitting, setReturnSubmitting] = useState(false);
+  const [returnError, setReturnError] = useState("");
   
   const [stats, setStats] = useState({
   totalProducts: 0,
@@ -37,6 +41,7 @@ const Dashboard = () => {
   totalDueAmount: 0,
   lowStockCount: 0,
   lowStockProducts: [],
+  cementStocks: [],
 });
 
 const [returnData, setReturnData] = useState({
@@ -160,19 +165,28 @@ const summaryCards = [
   cards[3],
 ];
 
-const handleMarkReturned = async (orderId) => {
-  const confirmReturn = window.confirm("Mark this rental order as returned?");
-  if (!confirmReturn) return;
+const handleMarkReturned = (order) => {
+  setReturnError("");
+  setReturnConfirm({ open: true, order });
+};
+
+const confirmMarkReturned = async () => {
+  const order = returnConfirm.order;
+  if (!order) return;
 
   try {
-    await API.patch(`/orders/${orderId}/mark-returned`, {
+    setReturnSubmitting(true);
+    await API.patch(`/orders/${order._id}/mark-returned`, {
       returnedDate: new Date(),
       addLateCharge: true,
     });
 
+    setReturnConfirm({ open: false, order: null });
     fetchStats();
   } catch (error) {
-    alert(error.response?.data?.message || "Failed to mark returned");
+    setReturnError(error.response?.data?.message || "Failed to mark returned");
+  } finally {
+    setReturnSubmitting(false);
   }
 };
 
@@ -337,6 +351,7 @@ const handleMarkReturned = async (orderId) => {
               </div>
             )}
           </SectionPanel>
+
         </div>
 
         <div className="space-y-5">
@@ -493,7 +508,7 @@ const handleMarkReturned = async (orderId) => {
                 </div>
 
                 <button
-                  onClick={() => handleMarkReturned(item._id)}
+                  onClick={() => handleMarkReturned(item)}
                   className="btn-success mt-4 w-full text-sm"
                 >
                   Mark Returned
@@ -516,6 +531,76 @@ const handleMarkReturned = async (orderId) => {
   open={quickSaleOpen}
   onClose={() => setQuickSaleOpen(false)}
 />
+{returnConfirm.open && (
+  <div className="mobile-sheet fixed inset-0 z-50 flex items-end bg-black/50 sm:items-center sm:justify-center sm:px-4">
+    <div className="modal-panel w-full max-w-lg overflow-hidden">
+      <div className="flex items-start justify-between border-b border-slate-200 px-4 py-4 sm:px-6">
+        <div>
+          <p className="text-xs font-black uppercase tracking-wide text-green-700">
+            Rental return
+          </p>
+          <h2 className="mt-1 text-xl font-black text-slate-950">
+            Mark this bill as returned?
+          </h2>
+        </div>
+        <button
+          type="button"
+          onClick={() => setReturnConfirm({ open: false, order: null })}
+          disabled={returnSubmitting}
+          className="btn-muted p-2"
+          aria-label="Close return confirmation"
+        >
+          <X size={20} />
+        </button>
+      </div>
+
+      <div className="space-y-4 p-4 sm:p-6">
+        <div className="rounded-2xl bg-slate-50 p-4">
+          <p className="font-black text-slate-900">{returnConfirm.order?.customerName}</p>
+          <div className="mt-3 space-y-2 text-sm text-slate-600">
+            {returnConfirm.order?.items?.map((item, index) => (
+              <div key={index} className="flex justify-between gap-3">
+                <span>{item.productName}</span>
+                <span className="font-bold text-slate-900">
+                  {item.quantity} {item.unit}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="text-sm font-medium leading-relaxed text-slate-600">
+          This will mark all rental items on this bill as returned. Any eligible late charge will be added automatically.
+        </p>
+
+        {returnError && (
+          <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-bold text-red-700" role="alert">
+            {returnError}
+          </p>
+        )}
+      </div>
+
+      <div className="thumb-footer flex flex-col-reverse gap-3 border-t border-slate-200 px-4 py-4 sm:flex-row sm:justify-end sm:px-6">
+        <button
+          type="button"
+          onClick={() => setReturnConfirm({ open: false, order: null })}
+          disabled={returnSubmitting}
+          className="btn-muted"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={confirmMarkReturned}
+          disabled={returnSubmitting}
+          className="btn-success"
+        >
+          {returnSubmitting ? "Saving..." : "Confirm return"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </AppLayout>
   );
 };

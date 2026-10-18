@@ -355,7 +355,7 @@ const Invoice = () => {
       return "Due amount does not match bill total and paid amount";
     }
 
-    if (billOrder.orderType === "rental") {
+    if (billOrder.orderType === "rental" || billOrder.orderType === "mixed") {
       if (!billOrder.rentalStartDate || !billOrder.rentalEndDate) {
         return "Rental dates are missing";
       }

@@ -81,11 +81,11 @@ const createOrder = async (req, res) => {
       return res.status(400).json({ message: "Order items are required" });
     }
 
-    if (!["sale", "rental"].includes(orderType)) {
+    if (!["sale", "rental", "mixed"].includes(orderType)) {
       return res.status(400).json({ message: "Invalid order type" });
     }
 
-    if (orderType === "rental") {
+    if (orderType === "rental" || orderType === "mixed") {
       if (!rentalStartDate || !rentalEndDate) {
         return res.status(400).json({
           message: "Rental start date and return date are required",
@@ -107,6 +107,11 @@ const createOrder = async (req, res) => {
     let itemsTotal = 0;
 
     for (const item of items) {
+      const itemType = item.itemType || (orderType === "rental" ? "rental" : "sale");
+      if (!["sale", "rental"].includes(itemType)) {
+        return res.status(400).json({ message: "Invalid item billing type" });
+      }
+
       const source = item.source === "outsourced" ? "outsourced" : "shop_stock";
       let product = null;
 
@@ -181,6 +186,7 @@ const createOrder = async (req, res) => {
       itemsTotal += total;
 
       orderItems.push({
+        itemType,
         product: product ? product._id : null,
         productName,
         unit: selectedUnit,
@@ -220,6 +226,12 @@ const createOrder = async (req, res) => {
       });
     }
 
+    if (finalPaidAmount > subTotal) {
+      return res.status(400).json({
+        message: "Paid amount cannot be greater than bill total",
+      });
+    }
+
     const dueAmount = Math.max(subTotal - finalPaidAmount, 0);
     const paymentStatus = getPaymentStatus(subTotal, finalPaidAmount);
 
@@ -240,14 +252,14 @@ const createOrder = async (req, res) => {
       notes,
 
       orderType,
-      rentalStartDate: orderType === "rental" ? rentalStartDate : null,
-      rentalEndDate: orderType === "rental" ? rentalEndDate : null,
-      rentalPeriodType: orderType === "rental" ? rentalPeriodType : "day",
+      rentalStartDate: orderType !== "sale" ? rentalStartDate : null,
+      rentalEndDate: orderType !== "sale" ? rentalEndDate : null,
+      rentalPeriodType: orderType !== "sale" ? rentalPeriodType : "day",
       rentalPeriodValue:
-        orderType === "rental" ? Number(rentalPeriodValue || 0) : 0,
-      returnStatus: orderType === "rental" ? "pending" : "not_required",
+        orderType !== "sale" ? Number(rentalPeriodValue || 0) : 0,
+      returnStatus: orderType !== "sale" ? "pending" : "not_required",
       lateChargePerDay:
-        orderType === "rental" ? Number(lateChargePerDay || 0) : 0,
+        orderType !== "sale" ? Number(lateChargePerDay || 0) : 0,
 
       createdBy: req.user._id,
     });
@@ -277,7 +289,7 @@ const createOrder = async (req, res) => {
         previousStock: update.previousStock,
         newStock: update.newStock,
         reason:
-          orderType === "rental"
+          orderType !== "sale"
             ? `Rental order created for ${customer.name}`
             : `Sale order created for ${customer.name}`,
         referenceType: "order",
@@ -288,7 +300,7 @@ const createOrder = async (req, res) => {
 
     return res.status(201).json({
       message:
-        orderType === "rental"
+        orderType !== "sale"
           ? "Rental order created and stock moved out"
           : "Sale order created and stock updated",
       order,
@@ -379,6 +391,29 @@ const updateOrder = async (req, res) => {
         });
       }
 
+      if (finalPaidAmount > Number(order.subTotal || 0)) {
+        return res.status(400).json({
+          message: "Paid amount cannot be greater than bill total",
+        });
+      }
+
+      const recordedPayments = await Payment.aggregate([
+        {
+          $match: {
+            order: order._id,
+            createdBy: req.user._id,
+          },
+        },
+        { $group: { _id: null, total: { $sum: "$amount" } } },
+      ]);
+      const recordedPaidAmount = Number(recordedPayments[0]?.total || 0);
+
+      if (Math.abs(recordedPaidAmount - finalPaidAmount) > 0.01) {
+        return res.status(400).json({
+          message: "Use Receive Payment to change payment history",
+        });
+      }
+
       order.paidAmount = finalPaidAmount;
       order.dueAmount = Math.max(order.subTotal - finalPaidAmount, 0);
       order.paymentStatus = getPaymentStatus(order.subTotal, finalPaidAmount);
@@ -412,7 +447,7 @@ const updateOrder = async (req, res) => {
 
 const deleteOrder = async (req, res) => {
   try {
-    const order = await Order.findOneAndDelete({
+    const order = await Order.findOne({
       _id: req.params.id,
       createdBy: req.user._id,
     });
@@ -423,8 +458,51 @@ const deleteOrder = async (req, res) => {
       });
     }
 
+    const stockMovements = await StockMovement.find({
+      referenceType: "order",
+      referenceId: order._id,
+      createdBy: req.user._id,
+    }).sort({ createdAt: -1, _id: -1 });
+
+    // Reverse only this order's stock delta, preserving later stock changes.
+    for (const movement of stockMovements) {
+      const product = await Product.findOne({
+        _id: movement.product,
+        createdBy: req.user._id,
+      });
+
+      if (!product) continue;
+
+      let reversal = 0;
+      if (movement.type === "stock_out") {
+        reversal = Number(movement.quantity || 0);
+      } else if (movement.type === "stock_in") {
+        reversal = -Number(movement.quantity || 0);
+      } else if (movement.type === "adjustment") {
+        reversal =
+          Number(movement.previousStock || 0) - Number(movement.newStock || 0);
+      }
+
+      product.currentStock = Math.max(
+        Number(product.currentStock || 0) + reversal,
+        0
+      );
+      await product.save();
+    }
+
+    await Payment.deleteMany({
+      order: order._id,
+      createdBy: req.user._id,
+    });
+    await StockMovement.deleteMany({
+      referenceType: "order",
+      referenceId: order._id,
+      createdBy: req.user._id,
+    });
+    await Order.deleteOne({ _id: order._id, createdBy: req.user._id });
+
     return res.json({
-      message: "Order deleted successfully",
+      message: "Order, payments and linked stock movements deleted successfully",
     });
   } catch (error) {
     return res.status(500).json({
@@ -465,13 +543,15 @@ const getReturnReminders = async (req, res) => {
 
     const orders = await Order.find({
       createdBy: req.user._id,
-      orderType: "rental",
-      returnStatus: { $in: ["pending", "late"] },
+      orderType: { $in: ["rental", "mixed"] },
+      returnStatus: { $in: ["pending", "partial", "late"] },
     })
       .populate("customer", "name phone address")
       .sort({ rentalEndDate: 1 });
 
-    const reminders = orders.map((order) => {
+    const reminders = orders
+      .filter((order) => order.items.some((item) => item.itemType === "rental" || !item.itemType))
+      .map((order) => {
       const returnDate = new Date(order.rentalEndDate);
       returnDate.setHours(23, 59, 59, 999);
 
@@ -500,7 +580,7 @@ const getReturnReminders = async (req, res) => {
         dueAmount: order.dueAmount,
         subTotal: order.subTotal,
       };
-    });
+      });
 
     const dueToday = reminders.filter((item) => {
       const d = new Date(item.rentalEndDate).toDateString();
@@ -533,7 +613,7 @@ const markOrderReturned = async (req, res) => {
     const order = await Order.findOne({
       _id: req.params.id,
       createdBy: req.user._id,
-      orderType: "rental",
+      orderType: { $in: ["rental", "mixed"] },
     });
 
     if (!order) {
@@ -576,7 +656,13 @@ const markOrderReturned = async (req, res) => {
 
     await order.save();
 
-    for (const item of order.items) {
+    const returnEntries = (order.adjustments || []).filter(
+      (entry) => entry.type === "return"
+    );
+
+    for (const item of order.items.filter(
+      (entry) => entry.itemType === "rental" || !entry.itemType
+    )) {
       const product = await Product.findOne({
         _id: item.product,
         createdBy: req.user._id,
@@ -584,7 +670,26 @@ const markOrderReturned = async (req, res) => {
 
       if (product) {
         const previousStock = product.currentStock;
-        const restoreQuantity = Number(item.baseQuantity || item.quantity || 0);
+        const purchasedQuantity = Number(
+          item.baseQuantity || item.quantity || 0
+        );
+        const itemProductId = item.product?.toString();
+        const returnedQuantity = returnEntries
+          .filter((entry) => entry.product?.toString() === itemProductId)
+          .reduce(
+            (sum, entry) =>
+              sum +
+              Number(entry.quantity || 0) *
+                Number(entry.conversionToBase || 1),
+            0
+          );
+        const restoreQuantity = Math.max(
+          purchasedQuantity - returnedQuantity,
+          0
+        );
+
+        if (restoreQuantity <= 0) continue;
+
         const newStock = previousStock + restoreQuantity;
 
         product.currentStock = newStock;
@@ -744,25 +849,25 @@ const createOrderAdjustment = async (req, res) => {
     }
 
     if (type === "return") {
-      if (!productId || !product) {
-        return res.status(400).json({
-          message: "Returned item is required",
-        });
-      }
-
       if (!isFiniteNumber(quantity) || Number(quantity) <= 0) {
         return res.status(400).json({
           message: "Return quantity must be greater than 0",
         });
       }
 
-      const orderItems = order.items.filter((item) => {
-        const itemProductId =
-          typeof item.product === "object"
-            ? item.product?._id?.toString()
-            : item.product?.toString();
-        return itemProductId === productId.toString();
-      });
+      const orderItems = productId
+        ? order.items.filter((item) => {
+            const itemProductId =
+              typeof item.product === "object"
+                ? item.product?._id?.toString()
+                : item.product?.toString();
+            return itemProductId === productId.toString();
+          })
+        : order.items.filter(
+            (item) =>
+              item.productName === productName &&
+              (!unit || (item.selectedUnit || item.unit) === unit)
+          );
 
       if (orderItems.length === 0) {
         return res.status(400).json({
@@ -798,11 +903,21 @@ const createOrderAdjustment = async (req, res) => {
       );
       const alreadyReturnedBaseQuantity = (order.adjustments || [])
         .filter((entry) => {
-          const entryProductId =
-            typeof entry.product === "object"
-              ? entry.product?._id?.toString()
-              : entry.product?.toString();
-          return entry.type === "return" && entryProductId === productId.toString();
+          if (entry.type !== "return") return false;
+
+          if (productId) {
+            const entryProductId =
+              typeof entry.product === "object"
+                ? entry.product?._id?.toString()
+                : entry.product?.toString();
+            return entryProductId === productId.toString();
+          }
+
+          return (
+            !entry.product &&
+            entry.productName === (productName || orderItems[0].productName) &&
+            (!unit || entry.unit === unit)
+          );
         })
         .reduce(
           (sum, entry) =>
@@ -837,7 +952,7 @@ const createOrderAdjustment = async (req, res) => {
       });
     }
 
-    if (stockImpact === "add_to_stock" && !product) {
+    if (type === "return" && stockImpact === "add_to_stock" && !product) {
       return res.status(400).json({
         message: "Product is required when adding returned stock",
       });
@@ -883,6 +998,53 @@ const createOrderAdjustment = async (req, res) => {
     order.paymentStatus = getPaymentStatus(order.subTotal, order.paidAmount);
 
     await order.save();
+
+    if (["rental", "mixed"].includes(order.orderType) && type === "return") {
+      const returnEntries = (order.adjustments || []).filter(
+        (entry) => entry.type === "return"
+      );
+      let returnedAny = false;
+      let fullyReturned = true;
+
+      for (const item of order.items.filter(
+        (entry) => entry.itemType === "rental" || !entry.itemType
+      )) {
+        const purchasedQuantity = Number(
+          item.baseQuantity || item.quantity || 0
+        );
+        const itemProductId = item.product?.toString();
+        const returnedQuantity = returnEntries
+          .filter((entry) => {
+            if (itemProductId) return entry.product?.toString() === itemProductId;
+            return (
+              !entry.product &&
+              entry.productName === item.productName &&
+              (!entry.unit || entry.unit === (item.selectedUnit || item.unit))
+            );
+          })
+          .reduce(
+            (sum, entry) =>
+              sum +
+              Number(entry.quantity || 0) *
+                Number(entry.conversionToBase || 1),
+            0
+          );
+
+        if (returnedQuantity > 0) returnedAny = true;
+        if (returnedQuantity + 0.0001 < purchasedQuantity) {
+          fullyReturned = false;
+        }
+      }
+
+      if (fullyReturned) {
+        order.returnStatus = "returned";
+        order.returnedDate = new Date();
+      } else if (returnedAny) {
+        order.returnStatus = "partial";
+      }
+
+      await order.save();
+    }
 
     if (stockImpact === "add_to_stock" && product) {
       const previousStock = Number(product.currentStock || 0);

@@ -12,6 +12,18 @@ const createCustomer = async (req, res) => {
       });
     }
 
+    const existingCustomer = await Customer.findOne({
+      phone: String(phone).trim(),
+      createdBy: req.user._id,
+    });
+
+    if (existingCustomer) {
+      return res.status(409).json({
+        message: "A customer with this mobile number already exists",
+        customer: existingCustomer,
+      });
+    }
+
     const customer = await Customer.create({
       name,
       phone,

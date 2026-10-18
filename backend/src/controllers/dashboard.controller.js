@@ -74,6 +74,16 @@ const getDashboardStats = async (req, res) => {
       .sort({ currentStock: 1 })
       .limit(10);
 
+    const cementStocks = await Product.find({
+      createdBy: userId,
+      isActive: true,
+      category: "building_material",
+      subCategory: "cement",
+      unit: "bag",
+    })
+      .select("name currentStock lowStockAlert unit")
+      .sort({ name: 1 });
+
     const stats = orderStats[0] || {
       totalSales: 0,
       totalPaid: 0,
@@ -89,6 +99,7 @@ const getDashboardStats = async (req, res) => {
       totalDueAmount: ledgerDueBalance,
       lowStockCount: lowStockProducts.length,
       lowStockProducts,
+      cementStocks,
     });
   } catch (error) {
     return res.status(500).json({

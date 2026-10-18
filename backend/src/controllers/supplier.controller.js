@@ -386,12 +386,16 @@ const createSupplierStockPurchase = async (req, res) => {
       unit,
       conversionToBase = 1,
       supplierRate,
+      paidAmount = 0,
+      paymentMode = "cash",
+      transactionDate,
       notes = "",
     } = req.body;
 
     const purchaseQuantity = Number(quantity);
     const finalConversionToBase = Number(conversionToBase || 1);
     const finalSupplierRate = Number(supplierRate);
+    const finalPaidAmount = Number(paidAmount || 0);
 
     if (!productId) {
       return res.status(400).json({
@@ -414,6 +418,18 @@ const createSupplierStockPurchase = async (req, res) => {
     if (!isFiniteNumber(finalSupplierRate) || finalSupplierRate <= 0) {
       return res.status(400).json({
         message: "Supplier rate must be greater than 0",
+      });
+    }
+
+    if (!isFiniteNumber(finalPaidAmount) || finalPaidAmount < 0) {
+      return res.status(400).json({
+        message: "Paid amount cannot be negative",
+      });
+    }
+
+    if (finalPaidAmount > purchaseQuantity * finalSupplierRate) {
+      return res.status(400).json({
+        message: "Paid amount cannot be greater than purchase amount",
       });
     }
 
@@ -455,7 +471,7 @@ const createSupplierStockPurchase = async (req, res) => {
       product: product._id,
       productName: product.name,
       type: "stock_purchase",
-      transactionDate: new Date(),
+      transactionDate: transactionDate || new Date(),
       quantity: purchaseQuantity,
       unit: unit || product.unit,
       conversionToBase: finalConversionToBase,
@@ -465,6 +481,19 @@ const createSupplierStockPurchase = async (req, res) => {
       notes,
       createdBy: req.user._id,
     });
+
+    let payment = null;
+    if (finalPaidAmount > 0) {
+      payment = await SupplierPayment.create({
+        supplier: supplier._id,
+        supplierName: supplier.name,
+        amount: finalPaidAmount,
+        paymentMode,
+        paymentDate: transactionDate || new Date(),
+        notes: notes || `Payment against ${product.name}`,
+        createdBy: req.user._id,
+      });
+    }
 
     await StockMovement.create({
       product: product._id,
@@ -481,6 +510,7 @@ const createSupplierStockPurchase = async (req, res) => {
     return res.status(201).json({
       message: "Supplier stock purchase saved successfully",
       transaction,
+      payment,
       product,
     });
   } catch (error) {

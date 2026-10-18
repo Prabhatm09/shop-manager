@@ -63,27 +63,41 @@ const CustomerFormModal = ({
 
               <div>
                 <label className="field-label">
-                  Phone Number
+                  Mobile Number <span className="font-medium text-slate-400">(+91, 10 digits)</span>
                 </label>
-                <input
-                  name="phone"
-                  value={form.phone}
-                  onChange={handleChange}
-                  placeholder="9876543210"
-                  className="form-control px-4 py-3"
-                />
+                <div className="flex overflow-hidden rounded-xl border border-slate-200 bg-white focus-within:border-amber-500 focus-within:ring-4 focus-within:ring-amber-100">
+                  <span className="flex min-h-12 items-center border-r border-slate-200 bg-slate-50 px-3 text-sm font-black text-slate-600">+91</span>
+                  <input
+                    name="phone"
+                    value={form.phone}
+                    onChange={(event) =>
+                      handleChange({
+                        target: {
+                          name: "phone",
+                          value: event.target.value.replace(/\D/g, "").slice(0, 10),
+                        },
+                      })
+                    }
+                    placeholder="9876543210"
+                    inputMode="numeric"
+                    maxLength={10}
+                    pattern="[0-9]{10}"
+                    className="min-w-0 flex-1 border-0 px-3 py-3 text-base outline-none"
+                    required
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="field-label">
-                  Address
+                  Address <span className="font-medium text-slate-400">(optional)</span>
                 </label>
                 <textarea
                   name="address"
                   value={form.address}
                   onChange={handleChange}
                   rows="3"
-                  placeholder="Customer address"
+                  placeholder="Customer address (optional)"
                   className="form-control resize-none px-4 py-3"
                 />
               </div>

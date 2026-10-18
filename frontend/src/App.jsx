@@ -14,6 +14,7 @@ import Invoice from "./pages/Invoice";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Profile from "./pages/Profile";
+import SimpleBilling from "./pages/SimpleBilling";
 
 
 
@@ -30,6 +31,7 @@ const App = () => {
       <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
       <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
       <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+      <Route path="/simple-billing" element={<ProtectedRoute><SimpleBilling /></ProtectedRoute>} />
       <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
       <Route path="/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

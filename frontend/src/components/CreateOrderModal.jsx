@@ -535,8 +535,8 @@ const CreateOrderModal = ({ open, onClose }) => {
     const phoneDigits = getPhoneDigits(newCustomer.phone);
 
     if (!newCustomer.name.trim()) return "Customer name is required";
-    if (phoneDigits.length < 10 || phoneDigits.length > 15) {
-      return "Enter a valid customer mobile number";
+    if (phoneDigits.length !== 10) {
+      return "Enter exactly 10 mobile digits";
     }
 
     return "";
@@ -636,7 +636,7 @@ const CreateOrderModal = ({ open, onClose }) => {
 
     const res = await API.post("/customers", {
       name: newCustomer.name,
-      phone: newCustomer.phone,
+      phone: `+91 ${getPhoneDigits(newCustomer.phone)}`,
       address: newCustomer.address,
       openingDue: 0,
     });
@@ -662,7 +662,7 @@ const CreateOrderModal = ({ open, onClose }) => {
       const customerId = await createCustomerIfNeeded();
 
       const payload = {
-        orderType: isRentalOrder ? "rental" : "sale",
+        orderType: orderType === "both" ? "mixed" : isRentalOrder ? "rental" : "sale",
         customerId,
         paidAmount: finalPaidAmount,
         paymentMode,
@@ -677,6 +677,16 @@ const CreateOrderModal = ({ open, onClose }) => {
           pricePerUnit: Number(item.pricePerUnit),
           conversionToBase: Number(item.conversionToBase || 1),
           source: item.source || "shop_stock",
+          itemType:
+            orderType === "both"
+              ? item.source === "outsourced"
+                ? "rental"
+                : ["timber", "other"].includes(item.category)
+                ? "rental"
+                : "sale"
+              : isRentalOrder
+              ? "rental"
+              : "sale",
         })),
       };
 
@@ -1274,20 +1284,34 @@ const CreateOrderModal = ({ open, onClose }) => {
                       className="form-control px-4 py-3"
                     />
 
-                    <input
-                      name="phone"
-                      value={newCustomer.phone}
-                      onChange={handleNewCustomerChange}
-                      placeholder="Mobile number"
-                      className="form-control px-4 py-3"
-                    />
+                    <div className="flex overflow-hidden rounded-xl border border-slate-200 bg-white focus-within:border-amber-500 focus-within:ring-4 focus-within:ring-amber-100">
+                      <span className="flex min-h-12 items-center border-r border-slate-200 bg-slate-50 px-3 text-sm font-black text-slate-600">+91</span>
+                      <input
+                        name="phone"
+                        value={getPhoneDigits(newCustomer.phone)}
+                        onChange={(event) =>
+                          handleNewCustomerChange({
+                            target: {
+                              name: "phone",
+                              value: event.target.value.replace(/\D/g, "").slice(0, 10),
+                            },
+                          })
+                        }
+                        placeholder="9876543210"
+                        inputMode="numeric"
+                        maxLength={10}
+                        pattern="[0-9]{10}"
+                        className="min-w-0 flex-1 border-0 px-3 py-3 text-base outline-none"
+                        required
+                      />
+                    </div>
 
                     <textarea
                       name="address"
                       value={newCustomer.address}
                       onChange={handleNewCustomerChange}
                       rows="3"
-                      placeholder="Customer address"
+                      placeholder="Customer address (optional)"
                       className="form-control resize-none px-4 py-3"
                     />
                   </div>

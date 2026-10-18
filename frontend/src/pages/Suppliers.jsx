@@ -18,6 +18,7 @@ const initialSupplierForm = {
 const createMaterialForm = (supplierId = "") => ({
   supplierId,
   transactionDate: today(),
+  productId: "",
   productName: "",
   quantity: "",
   unit: "",
@@ -41,6 +42,7 @@ const formatMoney = (amount) =>
 
 const Suppliers = () => {
   const [suppliers, setSuppliers] = useState([]);
+  const [products, setProducts] = useState([]);
   const [supplierForm, setSupplierForm] = useState(initialSupplierForm);
   const [materialForm, setMaterialForm] = useState(createMaterialForm());
   const [paymentForm, setPaymentForm] = useState(createPaymentForm());
@@ -61,10 +63,14 @@ const Suppliers = () => {
   const fetchSuppliers = async () => {
     try {
       setLoading(true);
-      const res = await API.get("/suppliers");
-      const list = res.data.suppliers || [];
+      const [supplierRes, productRes] = await Promise.all([
+        API.get("/suppliers"),
+        API.get("/products"),
+      ]);
+      const list = supplierRes.data.suppliers || [];
 
       setSuppliers(list);
+      setProducts(productRes.data.products || []);
       setSelectedSupplierId((current) => current || list[0]?._id || "");
     } catch (error) {
       setMessage(error.response?.data?.message || "Failed to load suppliers");
@@ -247,7 +253,7 @@ const Suppliers = () => {
     try {
       setSaving(true);
       setMessage("");
-      await API.post(`/suppliers/${selectedSupplier._id}/transactions`, {
+      const purchasePayload = {
         productName: materialForm.productName,
         quantity,
         unit: materialForm.unit,
@@ -257,7 +263,23 @@ const Suppliers = () => {
         paymentMode: materialForm.paymentMode,
         transactionDate: materialForm.transactionDate,
         notes: materialForm.notes,
-      });
+      };
+
+      if (materialForm.productId) {
+        await API.post(`/suppliers/${selectedSupplier._id}/stock-purchases`, {
+          productId: materialForm.productId,
+          quantity,
+          unit: materialForm.unit,
+          conversionToBase: 1,
+          supplierRate,
+          paidAmount,
+          paymentMode: materialForm.paymentMode,
+          transactionDate: materialForm.transactionDate,
+          notes: materialForm.notes,
+        });
+      } else {
+        await API.post(`/suppliers/${selectedSupplier._id}/transactions`, purchasePayload);
+      }
       setMaterialForm(createMaterialForm(selectedSupplier._id));
       setMessage("Material purchase saved");
       setActivePanel("ledger");
@@ -724,6 +746,39 @@ const Suppliers = () => {
                 {activePanel === "material" && (
                   <form onSubmit={handleMaterialSubmit} className="space-y-4">
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div>
+                        <label className="field-label">Track stock item (optional)</label>
+                        <select
+                          value={materialForm.productId}
+                          onChange={(e) => {
+                            const product = products.find((entry) => entry._id === e.target.value);
+                            setMaterialForm({
+                              ...materialForm,
+                              productId: e.target.value,
+                              productName: product?.name || materialForm.productName,
+                              unit: product?.unit || materialForm.unit,
+                            });
+                          }}
+                          className="form-control px-4 py-3"
+                        >
+                          <option value="">Manual material · no stock tracking</option>
+                          {products
+                            .filter(
+                              (product) =>
+                                product.category === "building_material" &&
+                                product.subCategory?.toLowerCase() === "cement" &&
+                                product.unit === "bag"
+                            )
+                            .map((product) => (
+                              <option key={product._id} value={product._id}>
+                                {product.name} · current {product.currentStock} bags
+                              </option>
+                            ))}
+                        </select>
+                        <p className="mt-1 text-xs font-semibold text-slate-500">
+                          Select Prism, Prism Plus, or Ultra Tech to add received bags to stock.
+                        </p>
+                      </div>
                       <div>
                         <label className="field-label">Material Name</label>
                         <input

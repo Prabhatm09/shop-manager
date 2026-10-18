@@ -62,8 +62,15 @@ const resetForm = () => {
     setLoading(true);
     setMessage("");
 
+    if (String(form.phone || "").length !== 10) {
+      setMessage("Enter exactly 10 mobile digits");
+      setLoading(false);
+      return;
+    }
+
     const payload = {
       ...form,
+      phone: `+91 ${form.phone}`,
       openingDue: Number(form.openingDue || 0),
     };
 
@@ -91,7 +98,7 @@ const handleEdit = (customer) => {
 
   setForm({
     name: customer.name || "",
-    phone: customer.phone || "",
+    phone: String(customer.phone || "").replace(/\D/g, "").slice(-10),
     address: customer.address || "",
     openingDue: customer.openingDue || "",
     notes: customer.notes || "",

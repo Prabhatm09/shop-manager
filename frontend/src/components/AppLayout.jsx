@@ -11,6 +11,7 @@ import {
   Truck,
   X,
   UserRound,
+  ReceiptText,
   MoreHorizontal,
 } from "lucide-react";
 
@@ -34,11 +35,6 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
       icon: LayoutDashboard,
     },
     {
-      label: "Products",
-      path: "/products",
-      icon: Package,
-    },
-    {
       label: "Customers",
       path: "/customers",
       icon: Users,
@@ -49,19 +45,9 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
       icon: ShoppingCart,
     },
     {
-      label: "Payments",
-      path: "/payments",
-      icon: IndianRupee,
-    },
-    {
-      label: "Suppliers",
-      path: "/suppliers",
-      icon: Truck,
-    },
-    {
-      label: "Profile",
-      path: "/profile",
-      icon: UserRound,
+      label: "Simple Billing",
+      path: "/simple-billing",
+      icon: ReceiptText,
     },
   ];
 
@@ -77,14 +63,14 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
       icon: ShoppingCart,
     },
     {
+      label: "Simple Bill",
+      path: "/simple-billing",
+      icon: ReceiptText,
+    },
+    {
       label: "Customers",
       path: "/customers",
       icon: Users,
-    },
-    {
-      label: "Products",
-      path: "/products",
-      icon: Package,
     },
   ];
 
@@ -103,6 +89,11 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
       label: "Profile",
       path: "/profile",
       icon: UserRound,
+    },
+    {
+      label: "Products",
+      path: "/products",
+      icon: Package,
     },
   ];
 
@@ -151,6 +142,36 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
             </NavLink>
           );
         })}
+        <button
+          type="button"
+          onClick={() => setMoreOpen((current) => !current)}
+          className="nav-link nav-link-idle flex w-full items-center gap-3 px-4 py-3 text-sm font-bold"
+        >
+          <MoreHorizontal size={19} />
+          More
+        </button>
+        {moreOpen && (
+          <div className="space-y-2 border-l-2 border-slate-200 pl-3">
+            {moreItems.map((item) => {
+              const Icon = item.icon;
+
+              return (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) =>
+                    `nav-link flex items-center gap-3 px-4 py-2.5 text-sm font-bold ${
+                      isActive ? "nav-link-active" : "nav-link-idle"
+                    }`
+                  }
+                >
+                  <Icon size={17} />
+                  {item.label}
+                </NavLink>
+              );
+            })}
+          </div>
+        )}
       </nav>
 
       <div
@@ -243,7 +264,7 @@ const AppLayout = ({ children, title, subtitle, headerAction }) => {
         </div>
       )}
 
-      <div className="min-w-0 min-h-screen">
+      <div className="min-w-0 min-h-screen h-[100dvh] overflow-y-auto overflow-x-hidden lg:h-auto lg:overflow-visible">
         <header className="shop-header sticky top-0 z-30 border-b px-6 py-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>

@@ -2,6 +2,12 @@ const mongoose = require("mongoose");
 
 const orderItemSchema = new mongoose.Schema(
   {
+    itemType: {
+      type: String,
+      enum: ["sale", "rental"],
+      default: "sale",
+    },
+
     product: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Product",
@@ -237,7 +243,7 @@ const orderSchema = new mongoose.Schema(
 
     orderType: {
       type: String,
-      enum: ["sale", "rental"],
+      enum: ["sale", "rental", "mixed"],
       default: "sale",
     },
 
@@ -293,7 +299,7 @@ const orderSchema = new mongoose.Schema(
 
     returnStatus: {
       type: String,
-      enum: ["not_required", "pending", "returned", "late"],
+      enum: ["not_required", "pending", "returned", "late", "partial"],
       default: "not_required",
     },
 
